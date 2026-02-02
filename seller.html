@@ -1,0 +1,1990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloom - Seller Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #FFF9F5; min-height: 100vh; }
+
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 70% { transform: scale(0.9); } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes glow { 0%, 100% { box-shadow: 0 0 5px rgba(255, 107, 107, 0.5); } 50% { box-shadow: 0 0 20px rgba(255, 107, 107, 0.8); } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    @keyframes confetti { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(-100px) rotate(720deg); opacity: 0; } }
+
+    .animate-float { animation: float 3s ease-in-out infinite; }
+    .animate-bounce-in { animation: bounceIn 0.6s ease-out; }
+    .animate-slide-up { animation: slideUp 0.4s ease-out; }
+    .animate-glow { animation: glow 2s ease-in-out infinite; }
+    .animate-spin { animation: spin 1s linear infinite; }
+    .animate-shake { animation: shake 0.5s ease-in-out; }
+
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #FF6B6B !important; box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2); }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #FFF9F5; }
+    ::-webkit-scrollbar-thumb { background: #FFD6D6; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #FF6B6B; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // =============================================
+    // CONFIGURATION - SUPABASE CREDENTIALS
+    // =============================================
+    const SUPABASE_URL = 'https://bqglrepbhjxmbgggdqal.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxZ2xyZXBiaGp4bWJnZ2dkcWFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5ODk4NzcsImV4cCI6MjA4NTU2NTg3N30.f9CdQ43T2_Fj2aurV2wUjuIESqjygBCnSZaIxYZzgCA';
+
+    // Initialize Supabase client
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const { useState, useEffect, useCallback } = React;
+
+    // =============================================
+    // DESIGN SYSTEM
+    // =============================================
+    const colors = {
+      primary: '#FF6B6B',
+      secondary: '#FF8E53',
+      accent: '#FFD93D',
+      mint: '#6BCB77',
+      lavender: '#B983FF',
+      cream: '#FFF9F5',
+      peach: '#FFE5D9',
+      blush: '#FFD6D6',
+      dark: '#2D3436',
+      gray: '#636E72',
+      lightGray: '#B2BEC3',
+      white: '#FFFFFF',
+      error: '#E74C3C',
+      success: '#27AE60',
+      gradient1: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
+      gradient2: 'linear-gradient(135deg, #B983FF 0%, #FF6B6B 100%)',
+      gradient3: 'linear-gradient(135deg, #6BCB77 0%, #FFD93D 100%)',
+    };
+
+    const shadows = {
+      sm: '0 2px 8px rgba(255, 107, 107, 0.15)',
+      md: '0 4px 20px rgba(255, 107, 107, 0.2)',
+      lg: '0 8px 40px rgba(255, 107, 107, 0.25)',
+    };
+
+    // =============================================
+    // REUSABLE COMPONENTS
+    // =============================================
+
+    // Loading Spinner
+    const Spinner = ({ size = 24 }) => (
+      <div style={{
+        width: size,
+        height: size,
+        border: `3px solid ${colors.blush}`,
+        borderTopColor: colors.primary,
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+      }} />
+    );
+
+    // Button Component
+    const Button = ({ children, onClick, variant = 'primary', disabled, loading, fullWidth, style = {} }) => {
+      const baseStyle = {
+        padding: '14px 28px',
+        borderRadius: 12,
+        border: 'none',
+        fontSize: 16,
+        fontWeight: 600,
+        cursor: disabled || loading ? 'not-allowed' : 'pointer',
+        transition: 'all 0.3s ease',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        width: fullWidth ? '100%' : 'auto',
+        opacity: disabled ? 0.6 : 1,
+        fontFamily: 'Plus Jakarta Sans, sans-serif',
+      };
+
+      const variants = {
+        primary: {
+          background: colors.gradient1,
+          color: colors.white,
+          boxShadow: shadows.md,
+        },
+        secondary: {
+          background: colors.white,
+          color: colors.primary,
+          border: `2px solid ${colors.primary}`,
+        },
+        ghost: {
+          background: 'transparent',
+          color: colors.gray,
+        },
+        success: {
+          background: colors.gradient3,
+          color: colors.dark,
+        },
+      };
+
+      return (
+        <button
+          onClick={onClick}
+          disabled={disabled || loading}
+          style={{ ...baseStyle, ...variants[variant], ...style }}
+          className={!disabled && !loading ? 'animate-glow' : ''}
+        >
+          {loading ? <Spinner size={20} /> : children}
+        </button>
+      );
+    };
+
+    // Input Component
+    const Input = ({ label, type = 'text', value, onChange, placeholder, required, error, multiline, rows = 4, icon }) => (
+      <div style={{ marginBottom: 20 }}>
+        {label && (
+          <label style={{
+            display: 'block',
+            marginBottom: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            color: colors.dark,
+          }}>
+            {label} {required && <span style={{ color: colors.primary }}>*</span>}
+          </label>
+        )}
+        <div style={{ position: 'relative' }}>
+          {icon && (
+            <span style={{
+              position: 'absolute',
+              left: 16,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: 20,
+            }}>{icon}</span>
+          )}
+          {multiline ? (
+            <textarea
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              rows={rows}
+              style={{
+                width: '100%',
+                padding: icon ? '14px 16px 14px 48px' : '14px 16px',
+                borderRadius: 12,
+                border: `2px solid ${error ? colors.error : colors.blush}`,
+                fontSize: 16,
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                background: colors.white,
+                resize: 'vertical',
+                transition: 'all 0.3s ease',
+              }}
+            />
+          ) : (
+            <input
+              type={type}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              style={{
+                width: '100%',
+                padding: icon ? '14px 16px 14px 48px' : '14px 16px',
+                borderRadius: 12,
+                border: `2px solid ${error ? colors.error : colors.blush}`,
+                fontSize: 16,
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                background: colors.white,
+                transition: 'all 0.3s ease',
+              }}
+            />
+          )}
+        </div>
+        {error && (
+          <p style={{ color: colors.error, fontSize: 13, marginTop: 6 }}>{error}</p>
+        )}
+      </div>
+    );
+
+    // Select Component
+    const Select = ({ label, value, onChange, options, required, placeholder }) => (
+      <div style={{ marginBottom: 20 }}>
+        {label && (
+          <label style={{
+            display: 'block',
+            marginBottom: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            color: colors.dark,
+          }}>
+            {label} {required && <span style={{ color: colors.primary }}>*</span>}
+          </label>
+        )}
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '14px 16px',
+            borderRadius: 12,
+            border: `2px solid ${colors.blush}`,
+            fontSize: 16,
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
+            background: colors.white,
+            cursor: 'pointer',
+            appearance: 'none',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23636E72'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 12px center',
+            backgroundSize: '20px',
+          }}
+        >
+          {placeholder && <option value="">{placeholder}</option>}
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    );
+
+    // Card Component
+    const Card = ({ children, style = {}, onClick, hover = false }) => (
+      <div
+        onClick={onClick}
+        style={{
+          background: colors.white,
+          borderRadius: 20,
+          padding: 24,
+          boxShadow: shadows.sm,
+          transition: 'all 0.3s ease',
+          cursor: onClick ? 'pointer' : 'default',
+          ...style,
+        }}
+        onMouseEnter={(e) => {
+          if (hover) {
+            e.currentTarget.style.transform = 'translateY(-4px)';
+            e.currentTarget.style.boxShadow = shadows.lg;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (hover) {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = shadows.sm;
+          }
+        }}
+      >
+        {children}
+      </div>
+    );
+
+    // Alert/Toast Component
+    const Alert = ({ message, type = 'info', onClose }) => {
+      const bgColors = {
+        success: colors.mint,
+        error: colors.primary,
+        info: colors.lavender,
+      };
+
+      return (
+        <div
+          className="animate-slide-up"
+          style={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            left: 20,
+            maxWidth: 400,
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            padding: '16px 20px',
+            borderRadius: 12,
+            background: bgColors[type],
+            color: colors.white,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: shadows.lg,
+            zIndex: 1000,
+          }}
+        >
+          <span>{message}</span>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: colors.white,
+              fontSize: 20,
+              cursor: 'pointer',
+              marginLeft: 12,
+            }}
+          >×</button>
+        </div>
+      );
+    };
+
+    // Multi-select chips for things like certifications, growing methods
+    const ChipSelect = ({ label, options, selected, onChange, required }) => (
+      <div style={{ marginBottom: 20 }}>
+        {label && (
+          <label style={{
+            display: 'block',
+            marginBottom: 12,
+            fontSize: 14,
+            fontWeight: 600,
+            color: colors.dark,
+          }}>
+            {label} {required && <span style={{ color: colors.primary }}>*</span>}
+          </label>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {options.map((opt) => {
+            const isSelected = selected.includes(opt.value);
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  if (isSelected) {
+                    onChange(selected.filter(s => s !== opt.value));
+                  } else {
+                    onChange([...selected, opt.value]);
+                  }
+                }}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 20,
+                  border: `2px solid ${isSelected ? colors.primary : colors.blush}`,
+                  background: isSelected ? colors.gradient1 : colors.white,
+                  color: isSelected ? colors.white : colors.dark,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                }}
+              >
+                {opt.icon && <span style={{ marginRight: 6 }}>{opt.icon}</span>}
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+
+    // Image Upload Component - uses base64 for simplicity (no storage bucket needed)
+    const ImageUpload = ({ images, onImagesChange, maxImages = 5 }) => {
+      const [uploading, setUploading] = useState(false);
+
+      const handleUpload = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        setUploading(true);
+        const newImages = [...images];
+
+        for (const file of files) {
+          if (newImages.length >= maxImages) break;
+
+          // Convert to base64 - simpler, no storage bucket needed
+          const reader = new FileReader();
+          const base64 = await new Promise((resolve) => {
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+          });
+
+          newImages.push(base64);
+        }
+
+        onImagesChange(newImages);
+        setUploading(false);
+      };
+
+      const removeImage = (index) => {
+        const newImages = images.filter((_, i) => i !== index);
+        onImagesChange(newImages);
+      };
+
+      return (
+        <div style={{ marginBottom: 20 }}>
+          <label style={{
+            display: 'block',
+            marginBottom: 12,
+            fontSize: 14,
+            fontWeight: 600,
+            color: colors.dark,
+          }}>
+            Product Images <span style={{ color: colors.gray, fontWeight: 400 }}>({images.length}/{maxImages})</span>
+          </label>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {images.map((url, index) => (
+              <div
+                key={index}
+                style={{
+                  position: 'relative',
+                  width: 100,
+                  height: 100,
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                }}
+              >
+                <img
+                  src={url}
+                  alt={`Product ${index + 1}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <button
+                  onClick={() => removeImage(index)}
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    background: colors.primary,
+                    color: colors.white,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    fontWeight: 'bold',
+                  }}
+                >×</button>
+              </div>
+            ))}
+
+            {images.length < maxImages && (
+              <label style={{
+                width: 100,
+                height: 100,
+                borderRadius: 12,
+                border: `2px dashed ${colors.blush}`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: uploading ? 'wait' : 'pointer',
+                transition: 'all 0.3s ease',
+                background: colors.cream,
+              }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleUpload}
+                  style={{ display: 'none' }}
+                  disabled={uploading}
+                />
+                {uploading ? (
+                  <Spinner size={24} />
+                ) : (
+                  <>
+                    <span style={{ fontSize: 28, color: colors.primary }}>+</span>
+                    <span style={{ fontSize: 12, color: colors.gray }}>Add Photo</span>
+                  </>
+                )}
+              </label>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // =============================================
+    // DATA OPTIONS
+    // =============================================
+    const CATEGORIES = [
+      { value: 'roses', label: '🌹 Roses' },
+      { value: 'tulips', label: '🌷 Tulips' },
+      { value: 'sunflowers', label: '🌻 Sunflowers' },
+      { value: 'lilies', label: '💐 Lilies' },
+      { value: 'orchids', label: '🪻 Orchids' },
+      { value: 'succulents', label: '🪴 Succulents' },
+      { value: 'arrangements', label: '💐 Arrangements' },
+      { value: 'dried', label: '🌾 Dried Flowers' },
+      { value: 'potted', label: '🌱 Potted Plants' },
+      { value: 'seasonal', label: '🍂 Seasonal' },
+      { value: 'other', label: '✨ Other' },
+    ];
+
+    const PRICE_UNITS = [
+      { value: 'per stem', label: 'Per Stem' },
+      { value: 'per bunch', label: 'Per Bunch (10 stems)' },
+      { value: 'per dozen', label: 'Per Dozen' },
+      { value: 'each', label: 'Each' },
+      { value: 'per arrangement', label: 'Per Arrangement' },
+    ];
+
+    const GROWING_METHODS = [
+      { value: 'organic', label: 'Organic', icon: '🌿' },
+      { value: 'sustainable', label: 'Sustainable', icon: '♻️' },
+      { value: 'hydroponic', label: 'Hydroponic', icon: '💧' },
+      { value: 'greenhouse', label: 'Greenhouse', icon: '🏠' },
+      { value: 'field-grown', label: 'Field Grown', icon: '🌾' },
+      { value: 'no-till', label: 'No-Till', icon: '🌱' },
+    ];
+
+    const CERTIFICATIONS = [
+      { value: 'usda-organic', label: 'USDA Organic', icon: '✅' },
+      { value: 'veriflora', label: 'Veriflora', icon: '🌸' },
+      { value: 'fair-trade', label: 'Fair Trade', icon: '🤝' },
+      { value: 'rainforest-alliance', label: 'Rainforest Alliance', icon: '🌳' },
+      { value: 'local-certified', label: 'Locally Certified', icon: '📍' },
+    ];
+
+    const FARM_SIZES = [
+      { value: 'backyard', label: 'Backyard Garden' },
+      { value: 'small', label: 'Small (< 1 acre)' },
+      { value: 'medium', label: 'Medium (1-5 acres)' },
+      { value: 'large', label: 'Large (5-20 acres)' },
+      { value: 'commercial', label: 'Commercial (20+ acres)' },
+      { value: 'greenhouse', label: 'Greenhouse Operation' },
+    ];
+
+    // =============================================
+    // CONFETTI COMPONENT
+    // =============================================
+    const Confetti = ({ active }) => {
+      if (!active) return null;
+      const pieces = Array.from({ length: 50 }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        delay: Math.random() * 0.5,
+        color: [colors.primary, colors.secondary, colors.accent, colors.mint, colors.lavender][Math.floor(Math.random() * 5)],
+      }));
+
+      return (
+        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 999 }}>
+          {pieces.map(p => (
+            <div
+              key={p.id}
+              style={{
+                position: 'absolute',
+                left: `${p.left}%`,
+                bottom: 0,
+                width: 10,
+                height: 10,
+                background: p.color,
+                borderRadius: '50%',
+                animation: `confetti 1.5s ease-out ${p.delay}s forwards`,
+              }}
+            />
+          ))}
+        </div>
+      );
+    };
+
+    // =============================================
+    // AUTH SCREENS
+    // =============================================
+
+    const AuthScreen = ({ onAuthSuccess }) => {
+      const [mode, setMode] = useState('signin'); // 'signin' or 'signup'
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [confirmPassword, setConfirmPassword] = useState('');
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        if (mode === 'signup' && password !== confirmPassword) {
+          setError('Passwords do not match');
+          setLoading(false);
+          return;
+        }
+
+        if (password.length < 6) {
+          setError('Password must be at least 6 characters');
+          setLoading(false);
+          return;
+        }
+
+        try {
+          if (mode === 'signup') {
+            const { data, error } = await supabase.auth.signUp({
+              email,
+              password,
+            });
+            if (error) throw error;
+            if (data.user) {
+              onAuthSuccess(data.user, true); // true = new user
+            }
+          } else {
+            const { data, error } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+            if (error) throw error;
+            if (data.user) {
+              onAuthSuccess(data.user, false); // false = existing user
+            }
+          }
+        } catch (err) {
+          setError(err.message);
+        }
+        setLoading(false);
+      };
+
+      return (
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 20,
+          background: `linear-gradient(180deg, ${colors.cream} 0%, ${colors.peach} 100%)`,
+        }}>
+          <Card style={{ maxWidth: 440, width: '100%', padding: 40 }} className="animate-bounce-in">
+            {/* Logo */}
+            <div style={{ textAlign: 'center', marginBottom: 32 }}>
+              <div
+                className="animate-float"
+                style={{
+                  fontSize: 48,
+                  marginBottom: 12,
+                }}
+              >🌸</div>
+              <h1 style={{
+                fontSize: 32,
+                fontWeight: 800,
+                background: colors.gradient1,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                marginBottom: 8,
+              }}>
+                Bloom
+              </h1>
+              <p style={{ color: colors.gray, fontSize: 16 }}>
+                {mode === 'signin' ? 'Welcome back, grower!' : 'Start selling your flowers'}
+              </p>
+            </div>
+
+            {/* Toggle */}
+            <div style={{
+              display: 'flex',
+              background: colors.cream,
+              borderRadius: 12,
+              padding: 4,
+              marginBottom: 28,
+            }}>
+              {['signin', 'signup'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => { setMode(m); setError(''); }}
+                  style={{
+                    flex: 1,
+                    padding: '12px 20px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: mode === m ? colors.white : 'transparent',
+                    color: mode === m ? colors.primary : colors.gray,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: mode === m ? shadows.sm : 'none',
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  }}
+                >
+                  {m === 'signin' ? 'Sign In' : 'Sign Up'}
+                </button>
+              ))}
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div
+                className="animate-shake"
+                style={{
+                  padding: '12px 16px',
+                  background: '#FFE5E5',
+                  borderRadius: 10,
+                  color: colors.error,
+                  fontSize: 14,
+                  marginBottom: 20,
+                  textAlign: 'center',
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit}>
+              <Input
+                label="Email"
+                type="email"
+                value={email}
+                onChange={setEmail}
+                placeholder="your@email.com"
+                required
+                icon="📧"
+              />
+              <Input
+                label="Password"
+                type="password"
+                value={password}
+                onChange={setPassword}
+                placeholder="••••••••"
+                required
+                icon="🔒"
+              />
+              {mode === 'signup' && (
+                <Input
+                  label="Confirm Password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  placeholder="••••••••"
+                  required
+                  icon="🔒"
+                />
+              )}
+
+              <Button
+                type="submit"
+                fullWidth
+                loading={loading}
+                style={{ marginTop: 12 }}
+              >
+                {mode === 'signin' ? 'Sign In 🌷' : 'Create Account 🌻'}
+              </Button>
+            </form>
+          </Card>
+        </div>
+      );
+    };
+
+    // =============================================
+    // PROFILE SETUP SCREEN
+    // =============================================
+
+    const ProfileSetupScreen = ({ user, onComplete, existingProfile }) => {
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+      const [step, setStep] = useState(1);
+      const totalSteps = 3;
+
+      // Form state
+      const [displayName, setDisplayName] = useState(existingProfile?.display_name || '');
+      const [farmName, setFarmName] = useState(existingProfile?.farm_name || '');
+      const [location, setLocation] = useState(existingProfile?.location || '');
+      const [bio, setBio] = useState(existingProfile?.bio || '');
+      const [phone, setPhone] = useState(existingProfile?.phone || '');
+      const [farmSize, setFarmSize] = useState(existingProfile?.farm_size || '');
+      const [yearsExperience, setYearsExperience] = useState(existingProfile?.years_experience || '');
+      const [growingMethods, setGrowingMethods] = useState(existingProfile?.growing_methods || []);
+      const [certifications, setCertifications] = useState(existingProfile?.certifications || []);
+      const [websiteUrl, setWebsiteUrl] = useState(existingProfile?.website_url || '');
+      const [instagramHandle, setInstagramHandle] = useState(existingProfile?.instagram_handle || '');
+      const [profilePhotoUrl, setProfilePhotoUrl] = useState(existingProfile?.profile_photo_url || '');
+      const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+      const handlePhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setUploadingPhoto(true);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        const filePath = `profiles/${fileName}`;
+
+        const { data, error } = await supabase.storage
+          .from('images')
+          .upload(filePath, file);
+
+        if (error) {
+          console.error('Upload error:', error);
+          setUploadingPhoto(false);
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('images')
+          .getPublicUrl(filePath);
+
+        setProfilePhotoUrl(publicUrl);
+        setUploadingPhoto(false);
+      };
+
+      const handleSubmit = async () => {
+        setError('');
+        setLoading(true);
+
+        // Use email username as fallback if no display name provided
+        const finalDisplayName = displayName.trim() || user.email.split('@')[0];
+
+        const profileData = {
+          user_id: user.id,
+          display_name: finalDisplayName,
+          email: user.email,
+          phone: phone.trim() || null,
+          location: location.trim() || null,
+          bio: bio.trim() || null,
+          profile_photo_url: profilePhotoUrl || null,
+          farm_name: farmName.trim() || null,
+          farm_size: farmSize || null,
+          years_experience: yearsExperience ? parseInt(yearsExperience) : null,
+          growing_methods: growingMethods.length > 0 ? growingMethods : null,
+          certifications: certifications.length > 0 ? certifications : null,
+          website_url: websiteUrl.trim() || null,
+          instagram_handle: instagramHandle.trim() || null,
+        };
+
+        try {
+          if (existingProfile) {
+            // Update existing profile
+            const { error } = await supabase
+              .from('profiles')
+              .update(profileData)
+              .eq('id', existingProfile.id);
+            if (error) throw error;
+          } else {
+            // Insert new profile
+            const { error } = await supabase
+              .from('profiles')
+              .insert([profileData]);
+            if (error) throw error;
+          }
+          onComplete();
+        } catch (err) {
+          setError(err.message);
+        }
+        setLoading(false);
+      };
+
+      const renderStep1 = () => (
+        <>
+          <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: colors.dark }}>
+            Let's start with the basics 🌱
+          </h2>
+          <p style={{ color: colors.gray, marginBottom: 28 }}>
+            Tell us about yourself
+          </p>
+
+          {/* Profile Photo */}
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{
+              width: 120,
+              height: 120,
+              borderRadius: '50%',
+              background: colors.gradient1,
+              margin: '0 auto 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              position: 'relative',
+            }}>
+              {profilePhotoUrl ? (
+                <img src={profilePhotoUrl} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: 48 }}>🌸</span>
+              )}
+            </div>
+            <label style={{
+              display: 'inline-block',
+              padding: '8px 20px',
+              background: colors.white,
+              border: `2px solid ${colors.primary}`,
+              borderRadius: 20,
+              color: colors.primary,
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: uploadingPhoto ? 'wait' : 'pointer',
+            }}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                style={{ display: 'none' }}
+                disabled={uploadingPhoto}
+              />
+              {uploadingPhoto ? 'Uploading...' : '📷 Upload Photo'}
+            </label>
+          </div>
+
+          <Input
+            label="Your Name"
+            value={displayName}
+            onChange={setDisplayName}
+            placeholder="John Smith (optional)"
+            icon="👤"
+          />
+          <Input
+            label="Farm/Business Name"
+            value={farmName}
+            onChange={setFarmName}
+            placeholder="Sunny Meadows Farm"
+            icon="🏡"
+          />
+          <Input
+            label="Location"
+            value={location}
+            onChange={setLocation}
+            placeholder="Portland, Oregon"
+            icon="📍"
+          />
+        </>
+      );
+
+      const renderStep2 = () => (
+        <>
+          <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: colors.dark }}>
+            Tell us about your growing 🌻
+          </h2>
+          <p style={{ color: colors.gray, marginBottom: 28 }}>
+            This helps buyers find you
+          </p>
+
+          <Select
+            label="Farm Size"
+            value={farmSize}
+            onChange={setFarmSize}
+            options={FARM_SIZES}
+            placeholder="Select your farm size"
+          />
+
+          <Input
+            label="Years of Experience"
+            type="number"
+            value={yearsExperience}
+            onChange={setYearsExperience}
+            placeholder="5"
+            icon="📅"
+          />
+
+          <ChipSelect
+            label="Growing Methods"
+            options={GROWING_METHODS}
+            selected={growingMethods}
+            onChange={setGrowingMethods}
+          />
+
+          <ChipSelect
+            label="Certifications"
+            options={CERTIFICATIONS}
+            selected={certifications}
+            onChange={setCertifications}
+          />
+        </>
+      );
+
+      const renderStep3 = () => (
+        <>
+          <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: colors.dark }}>
+            Final touches ✨
+          </h2>
+          <p style={{ color: colors.gray, marginBottom: 28 }}>
+            Connect with your customers
+          </p>
+
+          <Input
+            label="Bio"
+            multiline
+            rows={4}
+            value={bio}
+            onChange={setBio}
+            placeholder="Tell buyers about your story, what makes your flowers special..."
+          />
+
+          <Input
+            label="Phone Number"
+            type="tel"
+            value={phone}
+            onChange={setPhone}
+            placeholder="(555) 123-4567"
+            icon="📱"
+          />
+
+          <Input
+            label="Website"
+            type="url"
+            value={websiteUrl}
+            onChange={setWebsiteUrl}
+            placeholder="https://yourfarm.com"
+            icon="🌐"
+          />
+
+          <Input
+            label="Instagram Handle"
+            value={instagramHandle}
+            onChange={setInstagramHandle}
+            placeholder="@yourfarm"
+            icon="📸"
+          />
+        </>
+      );
+
+      return (
+        <div style={{
+          minHeight: '100vh',
+          padding: 20,
+          background: `linear-gradient(180deg, ${colors.cream} 0%, ${colors.peach} 100%)`,
+        }}>
+          <div style={{ maxWidth: 520, margin: '0 auto' }}>
+            {/* Progress */}
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 14, color: colors.gray }}>Step {step} of {totalSteps}</span>
+                <span style={{ fontSize: 14, color: colors.primary, fontWeight: 600 }}>
+                  {Math.round((step / totalSteps) * 100)}%
+                </span>
+              </div>
+              <div style={{
+                height: 8,
+                background: colors.blush,
+                borderRadius: 4,
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${(step / totalSteps) * 100}%`,
+                  background: colors.gradient1,
+                  borderRadius: 4,
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+            </div>
+
+            <Card style={{ padding: 32 }} className="animate-slide-up">
+              {error && (
+                <div
+                  className="animate-shake"
+                  style={{
+                    padding: '12px 16px',
+                    background: '#FFE5E5',
+                    borderRadius: 10,
+                    color: colors.error,
+                    fontSize: 14,
+                    marginBottom: 20,
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 32 }}>
+                {step > 1 && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setStep(step - 1)}
+                    style={{ flex: 1 }}
+                  >
+                    ← Back
+                  </Button>
+                )}
+                {step < totalSteps ? (
+                  <Button
+                    onClick={() => setStep(step + 1)}
+                    style={{ flex: 1 }}
+                  >
+                    Continue →
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSubmit}
+                    loading={loading}
+                    style={{ flex: 1 }}
+                  >
+                    Complete Setup 🎉
+                  </Button>
+                )}
+              </div>
+
+              {/* Skip option */}
+              <div style={{ textAlign: 'center', marginTop: 20 }}>
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: colors.gray,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  }}
+                >
+                  Skip for now →
+                </button>
+              </div>
+            </Card>
+          </div>
+        </div>
+      );
+    };
+
+    // =============================================
+    // CREATE LISTING SCREEN
+    // =============================================
+
+    const CreateListingScreen = ({ profile, onBack, onSuccess }) => {
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      const [title, setTitle] = useState('');
+      const [description, setDescription] = useState('');
+      const [price, setPrice] = useState('');
+      const [quantity, setQuantity] = useState('');
+      const [images, setImages] = useState([]);
+      const [growingMethod, setGrowingMethod] = useState('');
+
+      const handleSubmit = async () => {
+        setError('');
+
+        if (!title.trim()) {
+          setError('Title is required');
+          return;
+        }
+        if (!price || parseFloat(price) <= 0) {
+          setError('Please enter a valid price');
+          return;
+        }
+
+        setLoading(true);
+
+        try {
+          const { error } = await supabase
+            .from('listings')
+            .insert([{
+              seller_id: profile.id,
+              title: title.trim(),
+              description: description.trim() || null,
+              category: 'flowers',
+              price: parseFloat(price),
+              price_unit: 'per unit',
+              quantity_available: quantity ? parseInt(quantity) : null,
+              images: images.length > 0 ? images : null,
+              growing_method: growingMethod || null,
+              is_available: true,
+            }]);
+
+          if (error) throw error;
+          onSuccess();
+        } catch (err) {
+          setError(err.message);
+        }
+        setLoading(false);
+      };
+
+      return (
+        <div style={{
+          minHeight: '100vh',
+          padding: 20,
+          background: colors.cream,
+        }}>
+          <div style={{ maxWidth: 600, margin: '0 auto' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
+              <button
+                onClick={onBack}
+                style={{
+                  background: colors.white,
+                  border: 'none',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  fontSize: 20,
+                  cursor: 'pointer',
+                  boxShadow: shadows.sm,
+                  marginRight: 16,
+                }}
+              >←</button>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: colors.dark }}>
+                Create Listing 🌷
+              </h1>
+            </div>
+
+            <Card style={{ padding: 32 }} className="animate-slide-up">
+              {error && (
+                <div
+                  className="animate-shake"
+                  style={{
+                    padding: '12px 16px',
+                    background: '#FFE5E5',
+                    borderRadius: 10,
+                    color: colors.error,
+                    fontSize: 14,
+                    marginBottom: 20,
+                  }}
+                >
+                  {error}
+                </div>
+              )}
+
+              <ImageUpload
+                images={images}
+                onImagesChange={setImages}
+                maxImages={5}
+              />
+
+              <Input
+                label="Title"
+                value={title}
+                onChange={setTitle}
+                placeholder="Fresh Cut Roses - Mixed Colors"
+                required
+              />
+
+              <Input
+                label="Price (per unit)"
+                type="number"
+                value={price}
+                onChange={setPrice}
+                placeholder="50"
+                required
+                icon="฿"
+              />
+
+              <Input
+                label="Quantity Available"
+                type="number"
+                value={quantity}
+                onChange={setQuantity}
+                placeholder="100"
+              />
+
+              <Select
+                label="Growing Method"
+                value={growingMethod}
+                onChange={setGrowingMethod}
+                options={GROWING_METHODS}
+                placeholder="Select growing method (optional)"
+              />
+
+              <Input
+                label="Description"
+                multiline
+                rows={4}
+                value={description}
+                onChange={setDescription}
+                placeholder="Describe your product - variety, colors, freshness, special care instructions..."
+              />
+
+              <Button
+                onClick={handleSubmit}
+                loading={loading}
+                fullWidth
+                style={{ marginTop: 12 }}
+              >
+                Publish Listing 🚀
+              </Button>
+            </Card>
+          </div>
+        </div>
+      );
+    };
+
+    // =============================================
+    // LISTING CARD COMPONENT
+    // =============================================
+
+    const ListingCard = ({ listing, onEdit, onToggleAvailability, onDelete }) => {
+      return (
+        <Card hover style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 16 }}>
+            {/* Image */}
+            <div style={{
+              width: 100,
+              height: 100,
+              borderRadius: 12,
+              background: colors.gradient1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              flexShrink: 0,
+            }}>
+              {listing.images && listing.images[0] ? (
+                <img
+                  src={listing.images[0]}
+                  alt={listing.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <span style={{ fontSize: 40 }}>🌸</span>
+              )}
+            </div>
+
+            {/* Details */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                <h3 style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: colors.dark,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {listing.title}
+                </h3>
+                <span style={{
+                  padding: '4px 10px',
+                  borderRadius: 12,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: listing.is_available ? colors.mint : colors.lightGray,
+                  color: listing.is_available ? colors.dark : colors.white,
+                }}>
+                  {listing.is_available ? '✓ Active' : 'Hidden'}
+                </span>
+              </div>
+
+              <p style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: colors.primary,
+              }}>
+                ฿{parseFloat(listing.price).toFixed(0)}
+                <span style={{ fontSize: 14, fontWeight: 400, color: colors.gray }}> per unit</span>
+              </p>
+              {listing.quantity_available && (
+                <p style={{ fontSize: 13, color: colors.gray, marginTop: 4 }}>
+                  {listing.quantity_available} available
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{
+            display: 'flex',
+            gap: 10,
+            marginTop: 16,
+            paddingTop: 16,
+            borderTop: `1px solid ${colors.blush}`,
+          }}>
+            <Button
+              variant="secondary"
+              onClick={() => onEdit(listing)}
+              style={{ flex: 1, padding: '10px 16px', fontSize: 14 }}
+            >
+              ✏️ Edit
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => onToggleAvailability(listing)}
+              style={{ flex: 1, padding: '10px 16px', fontSize: 14 }}
+            >
+              {listing.is_available ? '👁️ Hide' : '👁️ Show'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => onDelete(listing)}
+              style={{ padding: '10px 16px', fontSize: 14, color: colors.error }}
+            >
+              🗑️
+            </Button>
+          </div>
+        </Card>
+      );
+    };
+
+    // =============================================
+    // DASHBOARD SCREEN
+    // =============================================
+
+    const DashboardScreen = ({ user, profile, onLogout, onEditProfile, onCreateListing }) => {
+      const [listings, setListings] = useState([]);
+      const [orders, setOrders] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [showConfetti, setShowConfetti] = useState(false);
+      const [alert, setAlert] = useState(null);
+      const [activeTab, setActiveTab] = useState('listings'); // 'listings' or 'orders'
+
+      const fetchListings = async () => {
+        const { data, error } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('seller_id', profile.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching listings:', error);
+        } else {
+          setListings(data || []);
+        }
+        setLoading(false);
+      };
+
+      const fetchOrders = async () => {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('seller_id', profile.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching orders:', error);
+        } else {
+          setOrders(data || []);
+        }
+      };
+
+      const updateOrderStatus = async (orderId, newStatus) => {
+        const { error } = await supabase
+          .from('orders')
+          .update({ status: newStatus })
+          .eq('id', orderId);
+
+        if (!error) {
+          fetchOrders();
+          setAlert({ type: 'success', message: `Order marked as ${newStatus}` });
+        }
+      };
+
+      useEffect(() => {
+        fetchListings();
+        fetchOrders();
+      }, [profile.id]);
+
+      const handleToggleAvailability = async (listing) => {
+        const { error } = await supabase
+          .from('listings')
+          .update({ is_available: !listing.is_available })
+          .eq('id', listing.id);
+
+        if (!error) {
+          fetchListings();
+          setAlert({
+            type: 'success',
+            message: listing.is_available ? 'Listing hidden from buyers' : 'Listing is now visible!',
+          });
+        }
+      };
+
+      const handleDelete = async (listing) => {
+        if (!window.confirm('Are you sure you want to delete this listing?')) return;
+
+        const { error } = await supabase
+          .from('listings')
+          .delete()
+          .eq('id', listing.id);
+
+        if (!error) {
+          fetchListings();
+          setAlert({ type: 'success', message: 'Listing deleted' });
+        }
+      };
+
+      const activeListings = listings.filter(l => l.is_available).length;
+
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: colors.cream,
+        }}>
+          <Confetti active={showConfetti} />
+
+          {alert && (
+            <Alert
+              message={alert.message}
+              type={alert.type}
+              onClose={() => setAlert(null)}
+            />
+          )}
+
+          {/* Header */}
+          <div style={{
+            background: colors.gradient1,
+            padding: '24px 20px 80px',
+            borderRadius: '0 0 32px 32px',
+          }}>
+            <div style={{ maxWidth: 800, margin: '0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span className="animate-float" style={{ fontSize: 32 }}>🌸</span>
+                  <span style={{ fontSize: 24, fontWeight: 800, color: colors.white }}>Bloom</span>
+                </div>
+                <button
+                  onClick={onLogout}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    color: colors.white,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontSize: 14,
+                  }}
+                >
+                  Sign Out
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: '50%',
+                  background: colors.white,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}>
+                  {profile.profile_photo_url ? (
+                    <img src={profile.profile_photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: 28 }}>🌱</span>
+                  )}
+                </div>
+                <div>
+                  <h1 style={{ fontSize: 24, fontWeight: 700, color: colors.white, marginBottom: 4 }}>
+                    Hey, {profile.display_name}! 👋
+                  </h1>
+                  <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>
+                    {profile.farm_name || profile.location || 'Welcome to your seller dashboard'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div style={{ maxWidth: 800, margin: '-48px auto 0', padding: '0 20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 24 }}>
+              <Card style={{ textAlign: 'center', padding: 20 }}>
+                <p style={{ fontSize: 32, fontWeight: 800, color: colors.primary, marginBottom: 4 }}>
+                  {listings.length}
+                </p>
+                <p style={{ fontSize: 14, color: colors.gray }}>Listings</p>
+              </Card>
+              <Card style={{ textAlign: 'center', padding: 20 }}>
+                <p style={{ fontSize: 32, fontWeight: 800, color: colors.secondary, marginBottom: 4 }}>
+                  {orders.filter(o => o.status === 'pending').length}
+                </p>
+                <p style={{ fontSize: 14, color: colors.gray }}>New Orders</p>
+              </Card>
+              <Card style={{ textAlign: 'center', padding: 20 }}>
+                <p style={{ fontSize: 32, fontWeight: 800, color: colors.mint, marginBottom: 4 }}>
+                  {orders.length}
+                </p>
+                <p style={{ fontSize: 14, color: colors.gray }}>Total Orders</p>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
+              <Button
+                onClick={() => {
+                  setShowConfetti(true);
+                  setTimeout(() => setShowConfetti(false), 2000);
+                  onCreateListing();
+                }}
+                style={{ flex: 1 }}
+              >
+                + New Listing
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={onEditProfile}
+                style={{ flex: 1 }}
+              >
+                ✏️ Edit Profile
+              </Button>
+            </div>
+
+            {/* Tab Buttons */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+              <button
+                onClick={() => setActiveTab('listings')}
+                style={{
+                  flex: 1,
+                  padding: '14px 20px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: activeTab === 'listings' ? colors.gradient1 : colors.white,
+                  color: activeTab === 'listings' ? colors.white : colors.dark,
+                  fontWeight: 600,
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                }}
+              >
+                📦 Listings ({listings.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('orders')}
+                style={{
+                  flex: 1,
+                  padding: '14px 20px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: activeTab === 'orders' ? colors.gradient1 : colors.white,
+                  color: activeTab === 'orders' ? colors.white : colors.dark,
+                  fontWeight: 600,
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  position: 'relative',
+                }}
+              >
+                🛒 Orders ({orders.length})
+                {orders.filter(o => o.status === 'pending').length > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: -5,
+                    right: -5,
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    background: colors.primary,
+                    color: colors.white,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    {orders.filter(o => o.status === 'pending').length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Content based on tab */}
+            {activeTab === 'orders' ? (
+              /* Orders Tab */
+              <div style={{ marginBottom: 32 }}>
+                {orders.length === 0 ? (
+                  <Card style={{ textAlign: 'center', padding: 48 }}>
+                    <div style={{ fontSize: 64, marginBottom: 16 }}>📭</div>
+                    <h3 style={{ fontSize: 20, fontWeight: 600, color: colors.dark, marginBottom: 8 }}>
+                      No orders yet
+                    </h3>
+                    <p style={{ color: colors.gray }}>
+                      When customers order your products, they'll appear here!
+                    </p>
+                  </Card>
+                ) : (
+                  orders.map(order => (
+                    <Card key={order.id} style={{ marginBottom: 16, padding: 24 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                        <div>
+                          <span style={{
+                            padding: '4px 12px',
+                            borderRadius: 20,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            background: order.status === 'pending' ? colors.accent :
+                                       order.status === 'confirmed' ? colors.lavender :
+                                       order.status === 'delivered' ? colors.mint : colors.lightGray,
+                            color: order.status === 'pending' ? colors.dark : colors.white,
+                          }}>
+                            {order.status === 'pending' ? '🆕 New Order' :
+                             order.status === 'confirmed' ? '✓ Confirmed' :
+                             order.status === 'delivered' ? '📦 Delivered' : order.status}
+                          </span>
+                          <p style={{ fontSize: 12, color: colors.gray, marginTop: 8 }}>
+                            {new Date(order.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <p style={{ fontSize: 24, fontWeight: 800, color: colors.primary }}>
+                          ฿{parseFloat(order.total).toFixed(0)}
+                        </p>
+                      </div>
+
+                      {/* Items */}
+                      <div style={{ background: colors.cream, borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                        {order.items.map((item, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: i < order.items.length - 1 ? 8 : 0 }}>
+                            <span style={{ color: colors.dark }}>{item.title} × {item.quantity}</span>
+                            <span style={{ fontWeight: 600, color: colors.dark }}>฿{(item.price * item.quantity).toFixed(0)}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Customer Info */}
+                      <div style={{ marginBottom: 16 }}>
+                        <p style={{ fontWeight: 600, color: colors.dark, marginBottom: 8 }}>
+                          👤 {order.customer_name}
+                        </p>
+                        <p style={{ fontSize: 14, color: colors.gray, marginBottom: 4 }}>
+                          📱 {order.customer_phone}
+                        </p>
+                        <p style={{ fontSize: 14, color: colors.gray }}>
+                          📍 {order.address}, {order.district}, {order.province} {order.postal_code}
+                        </p>
+                        {order.delivery_notes && (
+                          <p style={{ fontSize: 14, color: colors.lavender, marginTop: 8 }}>
+                            📝 {order.delivery_notes}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      {order.status === 'pending' && (
+                        <div style={{ display: 'flex', gap: 10 }}>
+                          <Button
+                            onClick={() => updateOrderStatus(order.id, 'confirmed')}
+                            style={{ flex: 1, padding: '12px 16px', fontSize: 14 }}
+                          >
+                            ✓ Confirm Order
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                            style={{ padding: '12px 16px', fontSize: 14, color: colors.error }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                      {order.status === 'confirmed' && (
+                        <Button
+                          variant="success"
+                          onClick={() => updateOrderStatus(order.id, 'delivered')}
+                          fullWidth
+                          style={{ padding: '12px 16px', fontSize: 14 }}
+                        >
+                          📦 Mark as Delivered
+                        </Button>
+                      )}
+                    </Card>
+                  ))
+                )}
+              </div>
+            ) : (
+              /* Listings Tab */
+              <div style={{ marginBottom: 32 }}>
+
+              {loading ? (
+                <Card style={{ textAlign: 'center', padding: 40 }}>
+                  <Spinner size={32} />
+                  <p style={{ color: colors.gray, marginTop: 12 }}>Loading listings...</p>
+                </Card>
+              ) : listings.length === 0 ? (
+                <Card style={{ textAlign: 'center', padding: 48 }}>
+                  <div className="animate-float" style={{ fontSize: 64, marginBottom: 16 }}>🌷</div>
+                  <h3 style={{ fontSize: 20, fontWeight: 600, color: colors.dark, marginBottom: 8 }}>
+                    No listings yet
+                  </h3>
+                  <p style={{ color: colors.gray, marginBottom: 24 }}>
+                    Create your first listing and start selling!
+                  </p>
+                  <Button onClick={onCreateListing}>
+                    Create Your First Listing 🚀
+                  </Button>
+                </Card>
+              ) : (
+                listings.map(listing => (
+                  <ListingCard
+                    key={listing.id}
+                    listing={listing}
+                    onEdit={() => {/* TODO: Implement edit */}}
+                    onToggleAvailability={handleToggleAvailability}
+                    onDelete={handleDelete}
+                  />
+                ))
+              )}
+            </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // =============================================
+    // MAIN APP
+    // =============================================
+
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [profile, setProfile] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [screen, setScreen] = useState('loading'); // loading, auth, setup, dashboard, create-listing
+      const [isNewUser, setIsNewUser] = useState(false);
+
+      // Check for existing session
+      useEffect(() => {
+        const checkSession = async () => {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            setUser(session.user);
+            await loadProfile(session.user.id);
+          } else {
+            setScreen('auth');
+          }
+          setLoading(false);
+        };
+        checkSession();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_OUT') {
+            setUser(null);
+            setProfile(null);
+            setScreen('auth');
+          }
+        });
+
+        return () => subscription.unsubscribe();
+      }, []);
+
+      const loadProfile = async (userId) => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+
+        if (data) {
+          setProfile(data);
+          setScreen('dashboard');
+        } else {
+          // No profile exists, need to create one
+          setScreen('setup');
+        }
+      };
+
+      const handleAuthSuccess = async (authenticatedUser, isNew) => {
+        setUser(authenticatedUser);
+        setIsNewUser(isNew);
+
+        if (isNew) {
+          setScreen('setup');
+        } else {
+          await loadProfile(authenticatedUser.id);
+        }
+      };
+
+      const handleProfileComplete = async () => {
+        await loadProfile(user.id);
+      };
+
+      const handleLogout = async () => {
+        await supabase.auth.signOut();
+      };
+
+      // Configuration check
+      if (SUPABASE_URL === 'YOUR_SUPABASE_URL' || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+        return (
+          <div style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+            background: colors.cream,
+          }}>
+            <Card style={{ maxWidth: 500, textAlign: 'center', padding: 40 }}>
+              <div className="animate-float" style={{ fontSize: 64, marginBottom: 20 }}>⚙️</div>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: colors.dark, marginBottom: 12 }}>
+                Setup Required
+              </h1>
+              <p style={{ color: colors.gray, marginBottom: 24, lineHeight: 1.6 }}>
+                To use this app, you need to add your Supabase credentials. Open this HTML file and update the configuration at the top:
+              </p>
+              <div style={{
+                background: colors.dark,
+                borderRadius: 12,
+                padding: 20,
+                textAlign: 'left',
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: '#A8E6CF',
+                overflowX: 'auto',
+              }}>
+                <div>const SUPABASE_URL = <span style={{ color: '#FFD93D' }}>'https://xxx.supabase.co'</span>;</div>
+                <div>const SUPABASE_ANON_KEY = <span style={{ color: '#FFD93D' }}>'your-anon-key'</span>;</div>
+              </div>
+              <p style={{ color: colors.gray, marginTop: 20, fontSize: 14 }}>
+                You can find these in your Supabase dashboard under Settings → API
+              </p>
+            </Card>
+          </div>
+        );
+      }
+
+      // Loading screen
+      if (loading || screen === 'loading') {
+        return (
+          <div style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: colors.gradient1,
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div className="animate-float" style={{ fontSize: 64, marginBottom: 20 }}>🌸</div>
+              <Spinner size={32} />
+            </div>
+          </div>
+        );
+      }
+
+      // Auth screen
+      if (screen === 'auth') {
+        return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+      }
+
+      // Profile setup screen
+      if (screen === 'setup') {
+        return (
+          <ProfileSetupScreen
+            user={user}
+            existingProfile={profile}
+            onComplete={handleProfileComplete}
+          />
+        );
+      }
+
+      // Create listing screen
+      if (screen === 'create-listing') {
+        return (
+          <CreateListingScreen
+            profile={profile}
+            onBack={() => setScreen('dashboard')}
+            onSuccess={() => setScreen('dashboard')}
+          />
+        );
+      }
+
+      // Dashboard
+      return (
+        <DashboardScreen
+          user={user}
+          profile={profile}
+          onLogout={handleLogout}
+          onEditProfile={() => setScreen('setup')}
+          onCreateListing={() => setScreen('create-listing')}
+        />
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
