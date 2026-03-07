@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232D7D46'/%3E%3Cstop offset='100%25' stop-color='%231a5c30'/%3E%3C/linearGradient%3E%3ClinearGradient id='gold' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23F2A900'/%3E%3Cstop offset='100%25' stop-color='%23d48c00'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23bg)'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-family='Georgia,serif' font-size='38' font-weight='bold' fill='white'%3EB%3C/text%3E%3Ccircle cx='48' cy='16' r='5' fill='url(%23gold)'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232D7D46'/%3E%3Cstop offset='100%25' stop-color='%231a5c30'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='0%25' y1='100%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' stop-color='%234CAF50'/%3E%3Cstop offset='100%25' stop-color='%2338a058'/%3E%3C/linearGradient%3E%3ClinearGradient id='g3' x1='50%25' y1='0%25' x2='50%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2366BB6A'/%3E%3Cstop offset='100%25' stop-color='%232D7D46'/%3E%3C/linearGradient%3E%3CradialGradient id='gc' cx='50%25' cy='50%25' r='50%25'%3E%3Cstop offset='0%25' stop-color='%23FFD54F'/%3E%3Cstop offset='100%25' stop-color='%23F2A900'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='32' cy='32' r='32' fill='%231A2E1A'/%3E%3Cellipse cx='32' cy='20' rx='10' ry='18' fill='url(%23g1)' opacity='0.9' transform='rotate(0 32 32)'/%3E%3Cellipse cx='32' cy='20' rx='10' ry='18' fill='url(%23g2)' opacity='0.8' transform='rotate(72 32 32)'/%3E%3Cellipse cx='32' cy='20' rx='10' ry='18' fill='url(%23g3)' opacity='0.75' transform='rotate(144 32 32)'/%3E%3Cellipse cx='32' cy='20' rx='10' ry='18' fill='url(%23g1)' opacity='0.7' transform='rotate(216 32 32)'/%3E%3Cellipse cx='32' cy='20' rx='10' ry='18' fill='url(%23g2)' opacity='0.65' transform='rotate(288 32 32)'/%3E%3Ccircle cx='32' cy='32' r='7' fill='url(%23gc)'/%3E%3Ccircle cx='32' cy='32' r='3.5' fill='%23F2A900' opacity='0.9'/%3E%3C/svg%3E">
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -137,22 +137,23 @@
             justifyContent: 'space-between',
           }}>
             <div onClick={() => onNavigate('home')} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-              {/* Bold iconic logo mark */}
-              <div style={{
-                width: 40, height: 40, borderRadius: 10,
-                background: colors.gradient1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(45,125,70,0.3)',
-                position: 'relative',
-              }}>
-                <span style={{ color: 'white', fontSize: 24, fontWeight: 800, fontFamily: 'Georgia, serif' }}>B</span>
-                <div style={{
-                  position: 'absolute', top: -3, right: -3,
-                  width: 10, height: 10, borderRadius: '50%',
-                  background: colors.accent,
-                  border: '2px solid white',
-                }} />
-              </div>
+              {/* Artisan Vector Bloom logo mark */}
+              <svg width="40" height="40" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="navG1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#2D7D46"/><stop offset="100%" stopColor="#1a5c30"/></linearGradient>
+                  <linearGradient id="navG2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stopColor="#4CAF50"/><stop offset="100%" stopColor="#38a058"/></linearGradient>
+                  <linearGradient id="navG3" x1="50%" y1="0%" x2="50%" y2="100%"><stop offset="0%" stopColor="#66BB6A"/><stop offset="100%" stopColor="#2D7D46"/></linearGradient>
+                  <radialGradient id="navGC" cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#FFD54F"/><stop offset="100%" stopColor="#F2A900"/></radialGradient>
+                </defs>
+                <circle cx="32" cy="32" r="32" fill="#1A2E1A"/>
+                <ellipse cx="32" cy="20" rx="10" ry="18" fill="url(#navG1)" opacity="0.9" transform="rotate(0 32 32)"/>
+                <ellipse cx="32" cy="20" rx="10" ry="18" fill="url(#navG2)" opacity="0.8" transform="rotate(72 32 32)"/>
+                <ellipse cx="32" cy="20" rx="10" ry="18" fill="url(#navG3)" opacity="0.75" transform="rotate(144 32 32)"/>
+                <ellipse cx="32" cy="20" rx="10" ry="18" fill="url(#navG1)" opacity="0.7" transform="rotate(216 32 32)"/>
+                <ellipse cx="32" cy="20" rx="10" ry="18" fill="url(#navG2)" opacity="0.65" transform="rotate(288 32 32)"/>
+                <circle cx="32" cy="32" r="7" fill="url(#navGC)"/>
+                <circle cx="32" cy="32" r="3.5" fill="#F2A900" opacity="0.9"/>
+              </svg>
               <span style={{
                 fontSize: 26, fontWeight: 800, letterSpacing: '-0.5px',
                 background: colors.gradient1,
