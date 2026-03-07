@@ -306,7 +306,7 @@
                 )}
               </button>
 
-              <button onClick={() => onNavigate('signin')} className="sell-link-desktop" style={{
+              <a href="seller.html" className="sell-link-desktop" style={{
                 padding: '12px 24px',
                 borderRadius: 25,
                 background: 'rgba(255,255,255,0.1)',
@@ -314,11 +314,11 @@
                 color: colors.white,
                 fontWeight: 600,
                 fontSize: 14,
-                cursor: 'pointer',
+                textDecoration: 'none',
                 fontFamily: 'Plus Jakarta Sans, sans-serif',
               }}>
                 Sign In
-              </button>
+              </a>
             </div>
           </div>
         </nav>
@@ -1542,7 +1542,6 @@
           case 'how-it-works': return <HowItWorksPage />;
           case 'about': return <AboutPage />;
           case 'contact': return <ContactPage />;
-          case 'signin': return <SignInPage />;
           default: return <HeroSection onNavigate={setCurrentPage} />;
         }
       };

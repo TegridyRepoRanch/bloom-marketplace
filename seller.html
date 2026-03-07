@@ -821,7 +821,11 @@
             }
           }
         } catch (err) {
-          setError(err.message);
+          if (err.message === 'Failed to fetch' || err.message.includes('NetworkError') || err.message.includes('fetch')) {
+            setError('Unable to connect to the server. The database may be paused — please contact the site admin to restore it, or try again in a few minutes.');
+          } else {
+            setError(err.message);
+          }
         }
         setLoading(false);
       };
