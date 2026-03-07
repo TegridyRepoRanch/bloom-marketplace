@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'><defs><linearGradient id='lg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' style='stop-color:%232D7D46'/><stop offset='100%25' style='stop-color:%231f5430'/></linearGradient><linearGradient id='ag' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' style='stop-color:%23F2A900'/><stop offset='100%25' style='stop-color:%23d48c00'/></linearGradient></defs><path d='M64 95Q63 75 64 55Q64.5 45 64 35' stroke='url(%23lg)' stroke-width='2.5' fill='none' stroke-linecap='round'/><path d='M64 50Q45 45 38 35Q35 28 40 22Q48 18 55 28Q60 38 64 50' fill='url(%23lg)' opacity='.9'/><path d='M64 50Q83 45 90 35Q93 28 88 22Q80 18 73 28Q68 38 64 50' fill='url(%23lg)' opacity='.9'/><path d='M64 65Q42 62 32 52Q26 45 32 40Q42 38 52 50Q59 60 64 65' fill='url(%23lg)' opacity='.85'/><path d='M64 65Q86 62 96 52Q102 45 96 40Q86 38 76 50Q69 60 64 65' fill='url(%23lg)' opacity='.85'/><path d='M64 80Q55 85 50 92Q48 98 55 100Q63 100 68 90Q68 85 64 80' fill='url(%23ag)' opacity='.8'/><circle cx='64' cy='65' r='4' fill='url(%23ag)' opacity='.7'/></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232D7D46'/%3E%3Cstop offset='100%25' stop-color='%231a5c30'/%3E%3C/linearGradient%3E%3ClinearGradient id='gold' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23F2A900'/%3E%3Cstop offset='100%25' stop-color='%23d48c00'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23bg)'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-family='Georgia,serif' font-size='38' font-weight='bold' fill='white'%3EB%3C/text%3E%3Ccircle cx='48' cy='16' r='5' fill='url(%23gold)'/%3E%3C/svg%3E">
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -24,6 +24,7 @@
     @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
     @keyframes confetti { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(-100px) rotate(720deg); opacity: 0; } }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 
     .animate-float { animation: float 4s ease-in-out infinite; }
     .animate-fade-in-up { animation: fadeInUp 0.8s ease-out forwards; }
@@ -135,29 +136,25 @@
             alignItems: 'center',
             justifyContent: 'space-between',
           }}>
-            <div onClick={() => onNavigate('home')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-              <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" style={{ width: 36, height: 36 }}>
-                <defs>
-                  <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#2D7D46' }} />
-                    <stop offset="100%" style={{ stopColor: '#1f5430' }} />
-                  </linearGradient>
-                  <linearGradient id="ag" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={{ stopColor: '#F2A900' }} />
-                    <stop offset="100%" style={{ stopColor: '#d48c00' }} />
-                  </linearGradient>
-                </defs>
-                <path d="M64 95Q63 75 64 55Q64.5 45 64 35" stroke="url(#lg)" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-                <path d="M64 50Q45 45 38 35Q35 28 40 22Q48 18 55 28Q60 38 64 50" fill="url(#lg)" opacity=".9" />
-                <path d="M64 50Q83 45 90 35Q93 28 88 22Q80 18 73 28Q68 38 64 50" fill="url(#lg)" opacity=".9" />
-                <path d="M64 65Q42 62 32 52Q26 45 32 40Q42 38 52 50Q59 60 64 65" fill="url(#lg)" opacity=".85" />
-                <path d="M64 65Q86 62 96 52Q102 45 96 40Q86 38 76 50Q69 60 64 65" fill="url(#lg)" opacity=".85" />
-                <path d="M64 80Q55 85 50 92Q48 98 55 100Q63 100 68 90Q68 85 64 80" fill="url(#ag)" opacity=".8" />
-                <circle cx="64" cy="65" r="4" fill="url(#ag)" opacity=".7" />
-              </svg>
+            <div onClick={() => onNavigate('home')} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+              {/* Bold iconic logo mark */}
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: colors.gradient1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(45,125,70,0.3)',
+                position: 'relative',
+              }}>
+                <span style={{ color: 'white', fontSize: 24, fontWeight: 800, fontFamily: 'Georgia, serif' }}>B</span>
+                <div style={{
+                  position: 'absolute', top: -3, right: -3,
+                  width: 10, height: 10, borderRadius: '50%',
+                  background: colors.accent,
+                  border: '2px solid white',
+                }} />
+              </div>
               <span style={{
-                fontSize: 24,
-                fontWeight: 800,
+                fontSize: 26, fontWeight: 800, letterSpacing: '-0.5px',
                 background: colors.gradient1,
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -248,66 +245,117 @@
     // =============================================
     // HERO SECTION
     // =============================================
-    const HeroSection = ({ onNavigate }) => (
-      <section style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '120px 24px 80px',
-        background: `linear-gradient(180deg, ${colors.cream} 0%, ${colors.peach} 100%)`,
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-          {['🌱', '🌿', '☀️', '🪴', '💧', '🍃'].map((flower, i) => (
-            <span key={i} className="animate-float" style={{
-              position: 'absolute',
-              fontSize: 40 + Math.random() * 30,
-              opacity: 0.3,
-              left: `${10 + i * 15}%`,
-              top: `${20 + (i % 3) * 25}%`,
-              animationDelay: `${i * 0.5}s`,
-            }}>{flower}</span>
-          ))}
-        </div>
+    const HeroSection = ({ onNavigate }) => {
+      const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
 
-        <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%', position: 'relative', zIndex: 1 }}>
+      useEffect(() => {
+        const handleMouse = (e) => {
+          setMousePos({
+            x: (e.clientX / window.innerWidth) * 100,
+            y: (e.clientY / window.innerHeight) * 100,
+          });
+        };
+        window.addEventListener('mousemove', handleMouse);
+        return () => window.removeEventListener('mousemove', handleMouse);
+      }, []);
+
+      return (
+        <section style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '120px 24px 80px',
+          background: colors.dark,
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          {/* Animated gradient blobs */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: 60,
-            alignItems: 'center',
+            position: 'absolute', inset: 0, overflow: 'hidden', opacity: 0.6,
           }}>
-            <div>
+            <div style={{
+              position: 'absolute',
+              width: 600, height: 600,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(45,125,70,0.4) 0%, transparent 70%)',
+              left: `${mousePos.x * 0.3}%`, top: `${mousePos.y * 0.3 - 20}%`,
+              transition: 'left 2s ease-out, top 2s ease-out',
+              filter: 'blur(40px)',
+            }} />
+            <div style={{
+              position: 'absolute',
+              width: 500, height: 500,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(242,169,0,0.25) 0%, transparent 70%)',
+              right: `${(100 - mousePos.x) * 0.2}%`, bottom: `${(100 - mousePos.y) * 0.2}%`,
+              transition: 'right 3s ease-out, bottom 3s ease-out',
+              filter: 'blur(60px)',
+            }} />
+            <div style={{
+              position: 'absolute',
+              width: 400, height: 400,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(123,79,158,0.2) 0%, transparent 70%)',
+              left: '60%', top: '20%',
+              animation: 'float 8s ease-in-out infinite',
+              filter: 'blur(50px)',
+            }} />
+          </div>
+
+          {/* Subtle grid pattern overlay */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+            backgroundSize: '60px 60px',
+          }} />
+
+          <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%', position: 'relative', zIndex: 1 }}>
+            <div style={{ textAlign: 'center', maxWidth: 900, margin: '0 auto' }}>
+              {/* Tagline chip */}
+              <div className="animate-fade-in-up" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '8px 20px', borderRadius: 30,
+                background: 'rgba(45,125,70,0.15)',
+                border: '1px solid rgba(45,125,70,0.3)',
+                marginBottom: 32,
+              }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4CAF50', animation: 'pulse 2s infinite' }} />
+                <span style={{ color: '#4CAF50', fontSize: 14, fontWeight: 600, letterSpacing: '0.5px' }}>LIVE MARKETPLACE</span>
+              </div>
+
               <h1 className="animate-fade-in-up" style={{
-                fontSize: 'clamp(40px, 8vw, 64px)',
+                fontSize: 'clamp(44px, 8vw, 80px)',
                 fontWeight: 800,
-                lineHeight: 1.1,
-                marginBottom: 24,
-                color: colors.dark,
+                lineHeight: 1.05,
+                marginBottom: 28,
+                color: colors.white,
+                letterSpacing: '-2px',
               }}>
                 Thailand's Premier{' '}
                 <span style={{
-                  background: colors.gradient1,
+                  background: 'linear-gradient(135deg, #4CAF50 0%, #F2A900 50%, #7B4F9E 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
+                  backgroundSize: '200% 200%',
+                  animation: 'gradientShift 4s ease-in-out infinite',
                 }}>Clone Marketplace</span>
               </h1>
 
               <p className="animate-fade-in-up" style={{
                 fontSize: 20,
-                color: colors.gray,
-                lineHeight: 1.6,
-                marginBottom: 36,
-                maxWidth: 480,
+                color: 'rgba(255,255,255,0.6)',
+                lineHeight: 1.7,
+                marginBottom: 48,
+                maxWidth: 600,
+                margin: '0 auto 48px',
                 animationDelay: '0.2s',
               }}>
                 Source verified clones, premium seeds, and craft buds from trusted growers across Thailand.
               </p>
 
-              <div className="animate-fade-in-up" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', animationDelay: '0.3s' }}>
-                <button onClick={() => onNavigate('products')} className="animate-pulse" style={{
-                  padding: '18px 36px',
+              <div className="animate-fade-in-up" style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', animationDelay: '0.3s' }}>
+                <button onClick={() => onNavigate('products')} style={{
+                  padding: '18px 40px',
                   borderRadius: 30,
                   border: 'none',
                   background: colors.gradient1,
@@ -315,33 +363,56 @@
                   fontWeight: 700,
                   fontSize: 18,
                   cursor: 'pointer',
-                  boxShadow: '0 8px 30px rgba(45, 125, 70, 0.4)',
+                  boxShadow: '0 8px 30px rgba(45, 125, 70, 0.5)',
                   fontFamily: 'Plus Jakarta Sans, sans-serif',
-                }}>
-                  Browse Clones 🌱
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseEnter={e => { e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 12px 40px rgba(45,125,70,0.6)'; }}
+                onMouseLeave={e => { e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = '0 8px 30px rgba(45,125,70,0.5)'; }}
+                >
+                  Browse Clones
+                </button>
+                <button onClick={() => window.location.href = 'seller.html'} style={{
+                  padding: '18px 40px',
+                  borderRadius: 30,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.05)',
+                  color: colors.white,
+                  fontWeight: 600,
+                  fontSize: 18,
+                  cursor: 'pointer',
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseEnter={e => { e.target.style.background = 'rgba(255,255,255,0.1)'; e.target.style.borderColor = 'rgba(255,255,255,0.4)'; }}
+                onMouseLeave={e => { e.target.style.background = 'rgba(255,255,255,0.05)'; e.target.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+                >
+                  Start Selling
                 </button>
               </div>
-            </div>
 
-            <div className="animate-scale-in" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <div style={{
-                width: 400,
-                height: 400,
-                borderRadius: '50%',
-                background: colors.gradient1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 30px 60px rgba(45, 125, 70, 0.3)',
-                position: 'relative',
+              {/* Stats bar */}
+              <div className="animate-fade-in-up" style={{
+                display: 'flex', justifyContent: 'center', gap: 48, marginTop: 80,
+                animationDelay: '0.5s',
               }}>
-                <span style={{ fontSize: 180 }}>🌱</span>
+                {[
+                  { value: '100+', label: 'Verified Vendors' },
+                  { value: '฿0', label: 'Platform Fees' },
+                  { value: '24/7', label: 'Marketplace' },
+                ].map((stat, i) => (
+                  <div key={i} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 32, fontWeight: 800, color: colors.white }}>{stat.value}</div>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: 500 }}>{stat.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-      </section>
-    );
+        </section>
+      );
+    };
 
     // =============================================
     // PRODUCT CARD
