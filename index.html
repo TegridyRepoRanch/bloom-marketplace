@@ -1267,6 +1267,7 @@
     // VENDORS PAGE
     // =============================================
     const VendorsPage = () => {
+      const isMobile = useIsMobile();
       const [vendors, setVendors] = useState([]);
       const [loading, setLoading] = useState(true);
 
@@ -1419,7 +1420,7 @@
           <p style={{ color: colors.lightGray, fontSize: 13, marginTop: 24 }}>© 2026 SiamClones. Made with 💖 in Thailand.</p>
         </div>
       </footer>
-    );
+    ); };
 
     // =============================================
     // MAIN APP
