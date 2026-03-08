@@ -300,6 +300,7 @@
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    border: '2px solid rgba(26,46,26,0.95)',
                   }}>
                     {cartCount}
                   </span>
@@ -348,7 +349,7 @@
           minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
-          padding: '120px 24px 80px',
+          padding: isMobile ? '80px 16px 40px' : '120px 24px 80px',
           background: colors.dark,
           position: 'relative',
           overflow: 'hidden',
@@ -476,11 +477,11 @@
           borderRadius: 20,
           overflow: 'hidden',
           boxShadow: '0 4px 20px rgba(45, 125, 70, 0.1)',
-          transition: 'all 0.3s ease',
+          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
           cursor: 'pointer',
         }}
         onMouseEnter={e => {
-          e.currentTarget.style.transform = 'translateY(-8px)';
+          e.currentTarget.style.transform = 'translateY(-6px)';
           e.currentTarget.style.boxShadow = '0 12px 40px rgba(45, 125, 70, 0.2)';
         }}
         onMouseLeave={e => {
@@ -503,7 +504,7 @@
         </div>
 
         <div style={{ padding: 20 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 8 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {listing.title}
           </h3>
           {listing.profiles && (
@@ -670,7 +671,7 @@
             }}>
               {/* Image */}
               <div style={{
-                height: 400,
+                height: isMobile ? 250 : 400,
                 borderRadius: 20,
                 background: colors.gradient1,
                 display: 'flex',
@@ -681,7 +682,7 @@
                 {product.images && product.images[0] ? (
                   <img src={product.images[0]} alt={product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <span style={{ fontSize: 120 }}>🌿</span>
+                  <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(45,125,70,0.3), rgba(242,169,0,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 80 }}>🌿</span></div>
                 )}
               </div>
 
@@ -735,7 +736,7 @@
                   <span style={{ fontWeight: 600, color: colors.dark }}>Quantity:</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <button onClick={() => setQuantity(Math.max(1, quantity - 1))} style={{
-                      width: 40, height: 40, borderRadius: '50%',
+                      width: 44, height: 44, borderRadius: '50%',
                       border: `2px solid ${colors.blush}`, background: colors.white,
                       fontSize: 20, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans',
                     }}>-</button>
@@ -743,7 +744,7 @@
                       {quantity}
                     </span>
                     <button onClick={() => setQuantity(quantity + 1)} style={{
-                      width: 40, height: 40, borderRadius: '50%',
+                      width: 44, height: 44, borderRadius: '50%',
                       border: `2px solid ${colors.blush}`, background: colors.white,
                       fontSize: 20, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans',
                     }}>+</button>
@@ -1321,7 +1322,7 @@
     // =============================================
     // ABOUT PAGE
     // =============================================
-    const AboutPage = () => (
+    const AboutPage = () => { const isMobile = useIsMobile(); return (
       <section style={{ minHeight: '100vh', padding: '120px 24px 80px', background: `linear-gradient(180deg, ${colors.peach} 0%, ${colors.cream} 100%)` }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 60 }}>
@@ -1338,7 +1339,7 @@
           </div>
         </div>
       </section>
-    );
+    ); };
 
     // =============================================
     // CONTACT PAGE
@@ -1390,107 +1391,22 @@
     ); };
 
     // =============================================
-    // SIGN IN PAGE (Password Gate)
-    // =============================================
-    const SignInPage = () => {
-      const isMobile = useIsMobile();
-      const [password, setPassword] = useState('');
-      const [error, setError] = useState('');
-      const [loading, setLoading] = useState(false);
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setTimeout(() => {
-          if (password === 'qwerty') {
-            window.location.href = 'seller.html';
-          } else {
-            setError('Incorrect password');
-            setLoading(false);
-          }
-        }, 500);
-      };
-
-      return (
-        <section style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: isMobile ? '100px 20px 40px' : '120px 24px 80px',
-          background: colors.dark,
-        }}>
-          <div style={{
-            maxWidth: 400,
-            width: '100%',
-            padding: isMobile ? 28 : 40,
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: 20,
-            border: '1px solid rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(20px)',
-          }}>
-            <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🔐</div>
-              <h2 style={{ fontSize: 28, fontWeight: 800, color: colors.white, marginBottom: 8 }}>Vendor Sign In</h2>
-              <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)' }}>Enter your password to access the dashboard</p>
-            </div>
-
-            <form onSubmit={handleSubmit}>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                placeholder="Password"
-                style={{
-                  width: '100%',
-                  padding: '16px 20px',
-                  borderRadius: 12,
-                  border: error ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.15)',
-                  background: 'rgba(255,255,255,0.08)',
-                  color: colors.white,
-                  fontSize: 16,
-                  fontFamily: 'Plus Jakarta Sans, sans-serif',
-                  outline: 'none',
-                  marginBottom: 8,
-                  boxSizing: 'border-box',
-                }}
-              />
-              {error && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 8, fontWeight: 500 }}>{error}</p>}
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  borderRadius: 12,
-                  border: 'none',
-                  background: colors.gradient1,
-                  color: colors.white,
-                  fontWeight: 700,
-                  fontSize: 16,
-                  cursor: loading ? 'wait' : 'pointer',
-                  fontFamily: 'Plus Jakarta Sans, sans-serif',
-                  marginTop: 8,
-                  opacity: loading ? 0.7 : 1,
-                  transition: 'all 0.3s ease',
-                }}
-              >
-                {loading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </form>
-          </div>
-        </section>
-      );
-    };
-
-    // =============================================
     // MAIN APP
     // =============================================
     const App = () => {
       const [currentPage, setCurrentPage] = useState('home');
       const [selectedProduct, setSelectedProduct] = useState(null);
-      const [cart, setCart] = useState([]);
+      const [cart, setCart] = useState(() => {
+        try {
+          const saved = localStorage.getItem('siamclones_cart');
+          return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+      });
       const [orderDetails, setOrderDetails] = useState(null);
+
+      useEffect(() => {
+        try { localStorage.setItem('siamclones_cart', JSON.stringify(cart)); } catch {}
+      }, [cart]);
 
       const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -1525,10 +1441,15 @@
       };
 
       const handlePlaceOrder = (details) => {
-        setOrderDetails(details);
+        setOrderDetails({ ...details, items: [...cart] });
         setCart([]);
+        try { localStorage.removeItem('siamclones_cart'); } catch {}
         setCurrentPage('order-confirmation');
       };
+
+      useEffect(() => {
+        window.scrollTo(0, 0);
+      }, [currentPage]);
 
       const renderPage = () => {
         switch (currentPage) {

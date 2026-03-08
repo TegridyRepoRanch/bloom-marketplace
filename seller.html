@@ -960,6 +960,7 @@
     // =============================================
 
     const ProfileSetupScreen = ({ user, onComplete, existingProfile }) => {
+      const isMobile = useIsMobile();
       const [loading, setLoading] = useState(false);
       const [error, setError] = useState('');
       const [step, setStep] = useState(1);
@@ -1325,6 +1326,7 @@
     // =============================================
 
     const CreateListingScreen = ({ profile, onBack, onSuccess }) => {
+      const isMobile = useIsMobile();
       const [loading, setLoading] = useState(false);
       const [error, setError] = useState('');
 
@@ -1350,6 +1352,11 @@
         }
         if (!price || parseFloat(price) <= 0) {
           setError('Please enter a valid price');
+          return;
+        }
+        if (!quantity || isNaN(parseInt(quantity)) || parseInt(quantity) <= 0) {
+          setError('Please enter a valid quantity');
+          setLoading(false);
           return;
         }
         if (!priceUnit) {
@@ -1439,7 +1446,7 @@
                 }}>
                   Product Category <span style={{ color: colors.primary }}>*</span>
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
                   {CATEGORIES.map((cat) => {
                     const isSelected = category === cat.value;
                     return (
@@ -1656,8 +1663,8 @@
     // =============================================
 
     const DashboardScreen = ({ user, profile, onLogout, onEditProfile, onCreateListing }) => {
-const isMobile = useIsMobile();
-            const [listings, setListings] = useState([]);
+      const isMobile = useIsMobile();
+      const [listings, setListings] = useState([]);
       const [orders, setOrders] = useState([]);
       const [loading, setLoading] = useState(true);
       const [showConfetti, setShowConfetti] = useState(false);
@@ -1816,7 +1823,7 @@ const isMobile = useIsMobile();
 
           {/* Stats Cards */}
           <div style={{ maxWidth: 800, margin: '-48px auto 0', padding: '0 20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 24 }}>
               <Card style={{ textAlign: 'center', padding: 20 }}>
                 <p style={{ fontSize: 32, fontWeight: 800, color: colors.primary, marginBottom: 4 }}>
                   {listings.length}
@@ -2096,6 +2103,10 @@ const isMobile = useIsMobile();
 
         return () => subscription.unsubscribe();
       }, []);
+
+      useEffect(() => {
+        window.scrollTo(0, 0);
+      }, [screen]);
 
       const loadProfile = async (userId) => {
         const { data, error } = await supabase
