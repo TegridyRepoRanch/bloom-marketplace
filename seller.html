@@ -698,9 +698,6 @@
       const [uploading, setUploading] = useState(false);
       const [uploadError, setUploadError] = useState('');
 
-      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-      const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
       const handleUpload = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
@@ -712,23 +709,9 @@
         for (const file of files) {
           if (newImages.length >= maxImages) break;
 
-          // Validate file size
-          if (file.size > MAX_FILE_SIZE) {
-            setUploadError('Image too large. Maximum 5MB per image.');
-            setUploading(false);
-            return;
-          }
-
-          // Validate file size
-          if (file.size > 5 * 1024 * 1024) {
-            setUploadError('File size must be less than 5MB.');
-            setUploading(false);
-            return;
-          }
-
-          // Validate file type
-          if (!ALLOWED_TYPES.includes(file.type)) {
-            setUploadError('Invalid image format. Please use JPEG, PNG, or WebP.');
+          // Validate it's an image
+          if (!file.type.startsWith('image/')) {
+            setUploadError('Please select an image file.');
             setUploading(false);
             return;
           }
@@ -1260,28 +1243,13 @@
       const [promptpayId, setPromptpayId] = useState(existingProfile?.promptpay_id || '');
       const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-      const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
       const handlePhotoUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file size
-        if (file.size > MAX_FILE_SIZE) {
-          setError('Image too large. Maximum 5MB per image.');
-          return;
-        }
-
-        // Validate file size
-        if (file.size > 5 * 1024 * 1024) {
-          setError('File size must be less than 5MB.');
-          return;
-        }
-
-        // Validate file type
-        if (!ALLOWED_TYPES.includes(file.type)) {
-          setError('Invalid image format. Please use JPEG, PNG, or WebP.');
+        // Validate it's an image
+        if (!file.type.startsWith('image/')) {
+          setError('Please select an image file.');
           return;
         }
 
