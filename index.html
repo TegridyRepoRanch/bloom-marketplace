@@ -2079,30 +2079,11 @@
                       background: '#fff', borderRadius: 16, padding: 20, display: 'inline-block',
                       boxShadow: '0 4px 20px rgba(26, 77, 176, 0.15)',
                     }}>
-                      {(() => {
-                        const sellerPPIds = {};
-                        cart.forEach(item => {
-                          const sid = item.product.seller_id;
-                          if (item.product.profiles?.promptpay_id) {
-                            sellerPPIds[sid] = item.product.profiles.promptpay_id;
-                          }
-                        });
-                        const ppEntries = Object.entries(sellerPPIds);
-                        if (ppEntries.length > 0) {
-                          return ppEntries.map(([sid, ppId]) => (
-                            <div key={sid} style={{ marginBottom: 12 }}>
-                              <PromptPayQR promptpayId={ppId} amount={total} size={isMobile ? 200 : 240} />
-                            </div>
-                          ));
-                        }
-                        // Fallback: show a placeholder message if no seller has PromptPay
-                        return (
-                          <div style={{ padding: 40, color: colors.gray }}>
-                            <p style={{ fontSize: 16, fontWeight: 600 }}>PromptPay QR</p>
-                            <p style={{ fontSize: 14 }}>Contact seller for payment details</p>
-                          </div>
-                        );
-                      })()}
+                      <img src="/payment-qr.png" alt="PromptPay QR Payment"
+                        style={{
+                          maxWidth: isMobile ? 240 : 300, width: '100%', height: 'auto',
+                          borderRadius: 12,
+                        }} />
                     </div>
 
                     <div style={{
