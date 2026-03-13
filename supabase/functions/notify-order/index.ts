@@ -27,6 +27,7 @@ interface OrderPayload {
   vendor_email: string | null;
   line_notify_token: string | null;
   payment_method: string;
+  payment_proof_url: string;
   created_at: string;
 }
 
@@ -68,7 +69,8 @@ async function sendEmail(payload: OrderPayload): Promise<boolean> {
           <p style="margin: 0 0 8px;"><strong>Phone:</strong> ${payload.buyer_phone}</p>
           <p style="margin: 0 0 8px;"><strong>Delivery:</strong> ${payload.delivery_address}</p>
           <p style="margin: 0 0 8px;"><strong>Total:</strong> ฿${payload.total_amount}</p>
-          <p style="margin: 0;"><strong>Payment:</strong> ${paymentMethodDisplay}</p>
+          <p style="margin: 0 0 8px;"><strong>Payment:</strong> ${paymentMethodDisplay}</p>
+          ${payload.payment_proof_url ? `<p style="margin: 0;"><strong>Payment Proof:</strong> <a href="${payload.payment_proof_url}" style="color: #2D7D46;">View Screenshot</a></p>` : ''}
         </div>
 
         <div style="background: #E8F5E9; padding: 16px; border-radius: 12px; margin: 20px 0;">
@@ -181,6 +183,7 @@ async function sendDiscordNotification(payload: OrderPayload): Promise<boolean> 
       { name: "Vendor", value: payload.vendor_name, inline: true },
       { name: "Delivery", value: payload.delivery_address, inline: false },
       { name: "Items", value: itemsList.substring(0, 1024), inline: false },
+      ...(payload.payment_proof_url ? [{ name: "Payment Proof", value: `[View Screenshot](${payload.payment_proof_url})`, inline: false }] : []),
     ],
     timestamp: payload.created_at || new Date().toISOString(),
     footer: {

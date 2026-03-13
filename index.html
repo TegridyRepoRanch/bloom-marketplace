@@ -1710,10 +1710,12 @@
     };
 
     // =============================================
-    // CHECKOUT PAGE
+    // CHECKOUT PAGE — Multi-step: Info → QR Payment → Screenshot Upload → Auto-submit
     // =============================================
     const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key }) => {
       const isMobile = useIsMobile();
+      // Step: 1 = delivery info, 2 = QR payment + screenshot upload
+      const [step, setStep] = useState(1);
       const [name, setName] = useState('');
       const [phone, setPhone] = useState('');
       const [address, setAddress] = useState('');
@@ -1721,46 +1723,77 @@
       const [province, setProvince] = useState('');
       const [postalCode, setPostalCode] = useState('');
       const [notes, setNotes] = useState('');
-      const [paymentMethod, setPaymentMethod] = useState('cod');
       const [loading, setLoading] = useState(false);
       const [error, setError] = useState('');
-
-      // Check if any seller in cart supports PromptPay
-      const hasPromptPay = cart.some(item => item.product.profiles?.promptpay_id);
+      const [uploadingProof, setUploadingProof] = useState(false);
+      const [proofPreview, setProofPreview] = useState(null);
+      const [proofFile, setProofFile] = useState(null);
+      const fileInputRef = React.useRef(null);
 
       const total = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
-      const handleSubmit = async (e) => {
+      const inputStyle = {
+        width: '100%', padding: '12px 16px', borderRadius: 12,
+        border: `2px solid ${colors.blush}`, fontSize: 16,
+        fontFamily: 'Plus Jakarta Sans, sans-serif', outline: 'none',
+        transition: 'border-color 0.3s', minHeight: 44,
+      };
+
+      // Step 1 → Step 2 validation
+      const handleContinueToPayment = (e) => {
         e.preventDefault();
         setError('');
 
-        // FIX 3: Form validation
         if (!name || !phone || !address || !district || !province || !postalCode) {
           setError('Please fill in all required fields');
           return;
         }
-
         if (name.length < 2) {
           setError('Name must be at least 2 characters');
           return;
         }
-
         const phoneDigits = phone.replace(/\D/g, '');
         if (phoneDigits.length < 9) {
           setError('Phone number must be at least 9 digits');
           return;
         }
-
         const postalDigits = postalCode.replace(/\D/g, '');
         if (postalDigits.length !== 5) {
           setError('Postal code must be exactly 5 digits');
           return;
         }
 
+        setStep(2);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
+      // Handle proof screenshot file selection
+      const handleProofSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+          setError('Please upload an image file (screenshot of your payment)');
+          return;
+        }
+        setError('');
+        setProofFile(file);
+        const reader = new FileReader();
+        reader.onload = (ev) => setProofPreview(ev.target.result);
+        reader.readAsDataURL(file);
+      };
+
+      // Upload proof to Supabase Storage and submit orders
+      const handleSubmitWithProof = async () => {
+        if (!proofFile) {
+          setError('Please upload your payment screenshot first');
+          return;
+        }
+
         setLoading(true);
+        setError('');
 
         try {
-          // FIX 8: Validate product stock before checkout
+          // Validate product stock
           for (const item of cart) {
             const { data, error } = await supabase
               .from('listings')
@@ -1773,7 +1806,6 @@
               setLoading(false);
               return;
             }
-
             if (data.quantity_available < item.quantity) {
               setError(`Only ${data.quantity_available} of "${item.product.title}" available.`);
               setLoading(false);
@@ -1781,13 +1813,31 @@
             }
           }
 
-          // Group items by seller and create separate orders for each seller
+          // Upload payment proof screenshot
+          const fileExt = proofFile.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+          const filePath = `proofs/${fileName}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('payment-proofs')
+            .upload(filePath, proofFile, { cacheControl: '3600', upsert: false });
+
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw new Error('Failed to upload payment screenshot. Please try again.');
+          }
+
+          const { data: urlData } = supabase.storage
+            .from('payment-proofs')
+            .getPublicUrl(filePath);
+
+          const proofUrl = urlData?.publicUrl || '';
+
+          // Group items by seller
           const sellerOrders = {};
           cart.forEach(item => {
             const sellerId = item.product.seller_id;
-            if (!sellerOrders[sellerId]) {
-              sellerOrders[sellerId] = [];
-            }
+            if (!sellerOrders[sellerId]) sellerOrders[sellerId] = [];
             sellerOrders[sellerId].push({
               listing_id: item.product.id,
               title: item.product.title,
@@ -1796,7 +1846,6 @@
             });
           });
 
-          // Sanitize customer inputs
           const sanitize = (str) => str ? str.replace(/[<>]/g, '') : '';
 
           // Create an order for each seller
@@ -1816,7 +1865,8 @@
                 postal_code: postalCode,
                 delivery_notes: sanitize(notes || ''),
                 seller_id: sellerId,
-                payment_method: paymentMethod,
+                payment_method: 'promptpay',
+                payment_proof_url: proofUrl,
                 status: 'pending',
               }]);
 
@@ -1824,35 +1874,74 @@
               console.error('Order error:', orderError);
               throw orderError;
             }
-
           }
 
-          // Collect PromptPay IDs from sellers in the cart
-          const sellerPromptPay = {};
-          cart.forEach(item => {
-            const sid = item.product.seller_id;
-            if (item.product.profiles?.promptpay_id) {
-              sellerPromptPay[sid] = item.product.profiles.promptpay_id;
-            }
-          });
-          onPlaceOrder({ name, phone, address, district, province, postalCode, notes, paymentMethod, sellerPromptPay, total });
+          onPlaceOrder({ name, phone, address, district, province, postalCode, notes, paymentMethod: 'promptpay', total });
         } catch (err) {
-          setError('Failed to place order. Please try again.');
+          setError(err.message || 'Failed to place order. Please try again.');
           setLoading(false);
         }
       };
 
-      const inputStyle = {
-        width: '100%', padding: '12px 16px', borderRadius: 12,
-        border: `2px solid ${colors.blush}`, fontSize: 16,
-        fontFamily: 'Plus Jakarta Sans, sans-serif', outline: 'none',
-        transition: 'border-color 0.3s', minHeight: 44,
-      };
+      // ---- Step indicators ----
+      const StepIndicator = () => (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: isMobile ? 24 : 40 }}>
+          {[
+            { num: 1, label: 'Delivery Info' },
+            { num: 2, label: 'Pay & Confirm' },
+          ].map((s, i) => (
+            <React.Fragment key={s.num}>
+              {i > 0 && (
+                <div style={{
+                  width: isMobile ? 40 : 60, height: 3, background: step >= s.num ? colors.primary : colors.blush,
+                  transition: 'background 0.3s',
+                }} />
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: step >= s.num ? colors.primary : colors.blush,
+                  color: step >= s.num ? '#fff' : colors.gray,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontSize: 14, transition: 'all 0.3s',
+                }}>
+                  {step > s.num ? '✓' : s.num}
+                </div>
+                <span style={{
+                  fontSize: 12, fontWeight: 600,
+                  color: step >= s.num ? colors.dark : colors.gray,
+                }}>{s.label}</span>
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+      );
+
+      // ---- Order summary (shared) ----
+      const OrderSummary = () => (
+        <div style={{
+          background: colors.cream, borderRadius: 16, padding: isMobile ? 14 : 20, marginBottom: isMobile ? 20 : 32,
+        }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: colors.dark, marginBottom: 16 }}>{t('checkout_summary')}</h3>
+          {cart.map((item, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ color: colors.gray }}>{item.product.title} × {item.quantity}</span>
+              <span style={{ fontWeight: 600, color: colors.dark }}>฿{(item.product.price * item.quantity).toFixed(0)}</span>
+            </div>
+          ))}
+          <div style={{ borderTop: `1px solid ${colors.blush}`, paddingTop: 12, marginTop: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 700, color: colors.dark }}>Total</span>
+              <span style={{ fontSize: 24, fontWeight: 800, color: colors.primary }}>฿{total.toFixed(0)}</span>
+            </div>
+          </div>
+        </div>
+      );
 
       return (
         <section style={{ minHeight: '100vh', padding: isMobile ? '80px 16px 40px' : '120px 24px 80px', background: colors.cream }}>
           <div style={{ maxWidth: 600, margin: '0 auto' }}>
-            <button onClick={onBack} style={{
+            <button onClick={step === 1 ? onBack : () => { setStep(1); setError(''); }} style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '12px 24px', borderRadius: 30, minHeight: 44,
               border: 'none', background: colors.white,
@@ -1861,68 +1950,20 @@
               boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
               fontFamily: 'Plus Jakarta Sans, sans-serif',
             }}>
-              ← Back to Cart
+              ← {step === 1 ? 'Back to Cart' : 'Back to Delivery Info'}
             </button>
 
-            <h2 style={{ fontSize: isMobile ? 24 : 36, fontWeight: 800, color: colors.dark, marginBottom: isMobile ? 24 : 40, textAlign: 'center' }}>
+            <h2 style={{ fontSize: isMobile ? 24 : 36, fontWeight: 800, color: colors.dark, marginBottom: 8, textAlign: 'center' }}>
               {t('checkout_title')} 📦
             </h2>
+
+            <StepIndicator />
 
             <div style={{
               background: colors.white, borderRadius: 24, padding: isMobile ? 20 : 40,
               boxShadow: '0 10px 40px rgba(45, 125, 70, 0.15)',
             }}>
-              {/* Order Summary */}
-              <div style={{
-                background: colors.cream, borderRadius: 16, padding: isMobile ? 14 : 20, marginBottom: isMobile ? 20 : 32,
-              }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: colors.dark, marginBottom: 16 }}>{t('checkout_summary')}</h3>
-                {cart.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ color: colors.gray }}>{item.product.title} × {item.quantity}</span>
-                    <span style={{ fontWeight: 600, color: colors.dark }}>฿{(item.product.price * item.quantity).toFixed(0)}</span>
-                  </div>
-                ))}
-                <div style={{ borderTop: `1px solid ${colors.blush}`, paddingTop: 12, marginTop: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 700, color: colors.dark }}>Total</span>
-                    <span style={{ fontSize: 24, fontWeight: 800, color: colors.primary }}>฿{total.toFixed(0)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Method Selection */}
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 16 }}>Payment Method</h3>
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 12, marginBottom: isMobile ? 20 : 32 }}>
-                <button type="button" onClick={() => setPaymentMethod('cod')} style={{
-                  flex: 1, padding: isMobile ? 16 : 20, borderRadius: 16, cursor: 'pointer', minHeight: 44,
-                  border: `2px solid ${paymentMethod === 'cod' ? colors.primary : colors.blush}`,
-                  background: paymentMethod === 'cod' ? colors.mint : colors.white,
-                  display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 16, fontFamily: 'Plus Jakarta Sans, sans-serif',
-                  transition: 'all 0.3s ease',
-                }}>
-                  <span style={{ fontSize: isMobile ? 24 : 28, flexShrink: 0 }}>💵</span>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: 700, color: colors.dark, fontSize: isMobile ? 14 : 15 }}>Cash on Delivery</div>
-                    <div style={{ fontSize: isMobile ? 12 : 13, color: colors.gray }}>Pay when you receive</div>
-                  </div>
-                </button>
-                {hasPromptPay && (
-                  <button type="button" onClick={() => setPaymentMethod('promptpay')} style={{
-                    flex: 1, padding: isMobile ? 16 : 20, borderRadius: 16, cursor: 'pointer', minHeight: 44,
-                    border: `2px solid ${paymentMethod === 'promptpay' ? '#1A4DB0' : colors.blush}`,
-                    background: paymentMethod === 'promptpay' ? '#E8F0FE' : colors.white,
-                    display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 16, fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    transition: 'all 0.3s ease',
-                  }}>
-                    <span style={{ fontSize: isMobile ? 24 : 28, flexShrink: 0 }}>📱</span>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: 700, color: colors.dark, fontSize: isMobile ? 14 : 15 }}>PromptPay</div>
-                      <div style={{ fontSize: isMobile ? 12 : 13, color: colors.gray }}>Scan QR to pay instantly</div>
-                    </div>
-                  </button>
-                )}
-              </div>
+              <OrderSummary />
 
               {error && (
                 <div style={{
@@ -1933,87 +1974,231 @@
                 </div>
               )}
 
-              {/* Address Form */}
-              <form onSubmit={handleSubmit}>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 20 }}>{t('checkout_delivery')}</h3>
+              {/* ========== STEP 1: Delivery Info ========== */}
+              {step === 1 && (
+                <form onSubmit={handleContinueToPayment}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 20 }}>{t('checkout_delivery')}</h3>
 
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
-                    {t('checkout_name')} *
-                  </label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = colors.primary}
-                    onBlur={e => e.target.style.borderColor = colors.blush} />
-                </div>
-
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
-                    {t('checkout_phone')} *
-                  </label>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08X-XXX-XXXX" style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = colors.primary}
-                    onBlur={e => e.target.style.borderColor = colors.blush} />
-                </div>
-
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
-                    {t('checkout_address')} *
-                  </label>
-                  <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2}
-                    placeholder="House number, street, building..." style={{ ...inputStyle, resize: 'vertical' }}
-                    onFocus={e => e.target.style.borderColor = colors.primary}
-                    onBlur={e => e.target.style.borderColor = colors.blush} />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
-                  <div>
+                  <div style={{ marginBottom: 20 }}>
                     <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
-                      {t('checkout_district')} *
+                      {t('checkout_name')} *
                     </label>
-                    <input type="text" value={district} onChange={e => setDistrict(e.target.value)} style={inputStyle}
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} style={inputStyle}
                       onFocus={e => e.target.style.borderColor = colors.primary}
                       onBlur={e => e.target.style.borderColor = colors.blush} />
                   </div>
-                  <div>
+
+                  <div style={{ marginBottom: 20 }}>
                     <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
-                      {t('checkout_province')} *
+                      {t('checkout_phone')} *
                     </label>
-                    <input type="text" value={province} onChange={e => setProvince(e.target.value)} style={inputStyle}
+                    <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08X-XXX-XXXX" style={inputStyle}
                       onFocus={e => e.target.style.borderColor = colors.primary}
                       onBlur={e => e.target.style.borderColor = colors.blush} />
                   </div>
-                </div>
 
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
-                    {t('checkout_postal')} *
-                  </label>
-                  <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="10XXX" style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = colors.primary}
-                    onBlur={e => e.target.style.borderColor = colors.blush} />
-                </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
+                      {t('checkout_address')} *
+                    </label>
+                    <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2}
+                      placeholder="House number, street, building..." style={{ ...inputStyle, resize: 'vertical' }}
+                      onFocus={e => e.target.style.borderColor = colors.primary}
+                      onBlur={e => e.target.style.borderColor = colors.blush} />
+                  </div>
 
-                <div style={{ marginBottom: 32 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
-                    {t('checkout_notes')}
-                  </label>
-                  <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-                    placeholder="Special instructions, landmarks, etc..." style={{ ...inputStyle, resize: 'vertical' }}
-                    onFocus={e => e.target.style.borderColor = colors.primary}
-                    onBlur={e => e.target.style.borderColor = colors.blush} />
-                </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
+                        {t('checkout_district')} *
+                      </label>
+                      <input type="text" value={district} onChange={e => setDistrict(e.target.value)} style={inputStyle}
+                        onFocus={e => e.target.style.borderColor = colors.primary}
+                        onBlur={e => e.target.style.borderColor = colors.blush} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
+                        {t('checkout_province')} *
+                      </label>
+                      <input type="text" value={province} onChange={e => setProvince(e.target.value)} style={inputStyle}
+                        onFocus={e => e.target.style.borderColor = colors.primary}
+                        onBlur={e => e.target.style.borderColor = colors.blush} />
+                    </div>
+                  </div>
 
-                <button type="submit" disabled={loading} style={{
-                  width: '100%', padding: isMobile ? '16px 24px' : '20px 40px', borderRadius: 30, minHeight: 44,
-                  border: 'none', background: loading ? colors.gray : colors.gradient1,
-                  color: colors.white, fontWeight: 700, fontSize: isMobile ? 16 : 18,
-                  cursor: loading ? 'wait' : 'pointer',
-                  boxShadow: '0 8px 30px rgba(45, 125, 70, 0.4)',
-                  fontFamily: 'Plus Jakarta Sans, sans-serif',
-                }}>
-                  {loading ? 'Processing...' : `${t('checkout_place')} - ฿${total.toFixed(0)}`}
-                </button>
-              </form>
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
+                      {t('checkout_postal')} *
+                    </label>
+                    <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="10XXX" style={inputStyle}
+                      onFocus={e => e.target.style.borderColor = colors.primary}
+                      onBlur={e => e.target.style.borderColor = colors.blush} />
+                  </div>
+
+                  <div style={{ marginBottom: 32 }}>
+                    <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.dark }}>
+                      {t('checkout_notes')}
+                    </label>
+                    <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                      placeholder="Special instructions, landmarks, etc..." style={{ ...inputStyle, resize: 'vertical' }}
+                      onFocus={e => e.target.style.borderColor = colors.primary}
+                      onBlur={e => e.target.style.borderColor = colors.blush} />
+                  </div>
+
+                  <button type="submit" style={{
+                    width: '100%', padding: isMobile ? '16px 24px' : '20px 40px', borderRadius: 30, minHeight: 44,
+                    border: 'none', background: colors.gradient1,
+                    color: colors.white, fontWeight: 700, fontSize: isMobile ? 16 : 18,
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 30px rgba(45, 125, 70, 0.4)',
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  }}>
+                    Continue to Payment →
+                  </button>
+                </form>
+              )}
+
+              {/* ========== STEP 2: QR Payment + Screenshot Upload ========== */}
+              {step === 2 && (
+                <div>
+                  {/* QR Code Display */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #E8F0FE 0%, #F0F7FF 100%)',
+                    borderRadius: 20, padding: isMobile ? 20 : 32, marginBottom: 24,
+                    textAlign: 'center', border: '2px solid #B8D4FE',
+                  }}>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, color: '#1A4DB0', marginBottom: 8 }}>
+                      📱 Scan to Pay via PromptPay
+                    </h3>
+                    <p style={{ fontSize: 14, color: colors.gray, marginBottom: 20 }}>
+                      Open your banking app, scan the QR code below, and transfer the exact amount.
+                    </p>
+
+                    {/* QR Image — uses seller PromptPay IDs from cart */}
+                    <div style={{
+                      background: '#fff', borderRadius: 16, padding: 20, display: 'inline-block',
+                      boxShadow: '0 4px 20px rgba(26, 77, 176, 0.15)',
+                    }}>
+                      {(() => {
+                        const sellerPPIds = {};
+                        cart.forEach(item => {
+                          const sid = item.product.seller_id;
+                          if (item.product.profiles?.promptpay_id) {
+                            sellerPPIds[sid] = item.product.profiles.promptpay_id;
+                          }
+                        });
+                        const ppEntries = Object.entries(sellerPPIds);
+                        if (ppEntries.length > 0) {
+                          return ppEntries.map(([sid, ppId]) => (
+                            <div key={sid} style={{ marginBottom: 12 }}>
+                              <PromptPayQR promptpayId={ppId} amount={total} size={isMobile ? 200 : 240} />
+                            </div>
+                          ));
+                        }
+                        // Fallback: show a placeholder message if no seller has PromptPay
+                        return (
+                          <div style={{ padding: 40, color: colors.gray }}>
+                            <p style={{ fontSize: 16, fontWeight: 600 }}>PromptPay QR</p>
+                            <p style={{ fontSize: 14 }}>Contact seller for payment details</p>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div style={{
+                      marginTop: 20, background: '#1A4DB0', color: '#fff',
+                      borderRadius: 12, padding: '12px 24px', display: 'inline-block',
+                    }}>
+                      <span style={{ fontSize: 14, opacity: 0.9 }}>Amount to transfer:</span>
+                      <div style={{ fontSize: 28, fontWeight: 800 }}>฿{total.toFixed(0)}</div>
+                    </div>
+                  </div>
+
+                  {/* Screenshot Upload */}
+                  <div style={{
+                    background: colors.cream, borderRadius: 20, padding: isMobile ? 20 : 32, marginBottom: 24,
+                    textAlign: 'center',
+                  }}>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 8 }}>
+                      Upload Payment Screenshot
+                    </h3>
+                    <p style={{ fontSize: 14, color: colors.gray, marginBottom: 20 }}>
+                      After paying, take a screenshot of the confirmation and upload it below.
+                    </p>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProofSelect}
+                      style={{ display: 'none' }}
+                    />
+
+                    {!proofPreview ? (
+                      <button type="button" onClick={() => fileInputRef.current?.click()} style={{
+                        width: '100%', padding: 32, borderRadius: 16,
+                        border: `3px dashed ${colors.blush}`, background: 'transparent',
+                        cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', gap: 12, fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        transition: 'all 0.3s',
+                      }}
+                        onMouseOver={e => { e.currentTarget.style.borderColor = colors.primary; e.currentTarget.style.background = colors.mint; }}
+                        onMouseOut={e => { e.currentTarget.style.borderColor = colors.blush; e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <span style={{ fontSize: 40 }}>📷</span>
+                        <span style={{ fontWeight: 600, color: colors.dark, fontSize: 16 }}>Tap to upload screenshot</span>
+                        <span style={{ fontSize: 13, color: colors.gray }}>Accepts any image format</span>
+                      </button>
+                    ) : (
+                      <div>
+                        <div style={{
+                          position: 'relative', display: 'inline-block',
+                          borderRadius: 16, overflow: 'hidden', border: `3px solid ${colors.primary}`,
+                          boxShadow: '0 4px 20px rgba(45, 125, 70, 0.2)',
+                        }}>
+                          <img src={proofPreview} alt="Payment proof" style={{
+                            maxWidth: '100%', maxHeight: 300, display: 'block',
+                          }} />
+                          <div style={{
+                            position: 'absolute', top: 8, right: 8,
+                            background: colors.primary, color: '#fff',
+                            borderRadius: '50%', width: 28, height: 28,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 16, fontWeight: 700,
+                          }}>✓</div>
+                        </div>
+                        <button type="button" onClick={() => { setProofFile(null); setProofPreview(null); fileInputRef.current.value = ''; }} style={{
+                          display: 'block', margin: '12px auto 0', padding: '8px 20px',
+                          borderRadius: 20, border: `1px solid ${colors.blush}`,
+                          background: colors.white, color: colors.gray,
+                          fontSize: 13, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        }}>
+                          Choose different image
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="button"
+                    disabled={loading || !proofFile}
+                    onClick={handleSubmitWithProof}
+                    style={{
+                      width: '100%', padding: isMobile ? '16px 24px' : '20px 40px', borderRadius: 30, minHeight: 44,
+                      border: 'none',
+                      background: (!proofFile || loading) ? colors.gray : colors.gradient1,
+                      color: colors.white, fontWeight: 700, fontSize: isMobile ? 16 : 18,
+                      cursor: (!proofFile || loading) ? 'not-allowed' : 'pointer',
+                      boxShadow: proofFile && !loading ? '0 8px 30px rgba(45, 125, 70, 0.4)' : 'none',
+                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                      transition: 'all 0.3s',
+                    }}
+                  >
+                    {loading ? 'Submitting Order...' : proofFile ? `Confirm Order — ฿${total.toFixed(0)}` : 'Upload screenshot to continue'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -2143,37 +2328,16 @@
               </p>
             </div>
 
-            {order.paymentMethod === 'promptpay' && order.sellerPromptPay ? (
-              <div style={{ marginBottom: 32 }}>
-                <div style={{
-                  background: '#E8F0FE', borderRadius: 16, padding: 24, marginBottom: 16,
-                  textAlign: 'center',
-                }}>
-                  <h4 style={{ fontWeight: 700, color: '#1A4DB0', marginBottom: 16 }}>
-                    📱 {t('order_pay_promptpay')}
-                  </h4>
-                  <p style={{ fontSize: 14, color: colors.gray, marginBottom: 16 }}>
-                    {t('order_scan_qr')}
-                  </p>
-                  {Object.entries(order.sellerPromptPay).map(([sellerId, ppId]) => (
-                    <div key={sellerId} style={{ marginBottom: 12 }}>
-                      <PromptPayQR promptpayId={ppId} amount={order.total} size={220} />
-                    </div>
-                  ))}
-                  <p style={{ fontSize: 20, fontWeight: 800, color: '#1A4DB0', marginTop: 12 }}>
-                    ฿{order.total?.toFixed(0)}
-                  </p>
-                </div>
+            <div style={{
+              background: '#E8F5E9', borderRadius: 16, padding: 24, marginBottom: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+            }}>
+              <span style={{ fontSize: 28 }}>✅</span>
+              <div style={{ textAlign: 'left' }}>
+                <span style={{ fontWeight: 700, color: colors.dark, display: 'block' }}>Payment Proof Received</span>
+                <span style={{ fontSize: 13, color: colors.gray }}>Your order is being processed. The seller will contact you soon.</span>
               </div>
-            ) : (
-              <div style={{
-                background: colors.mint, borderRadius: 16, padding: 20, marginBottom: 32,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-              }}>
-                <span style={{ fontSize: 24 }}>💵</span>
-                <span style={{ fontWeight: 600, color: colors.dark }}>{t('order_cod_message')}</span>
-              </div>
-            )}
+            </div>
 
             <p style={{ color: colors.gray, marginBottom: 32, fontSize: 14 }}>
               {t('order_vendor_contact')} 🌿
