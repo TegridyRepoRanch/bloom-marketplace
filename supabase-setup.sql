@@ -134,14 +134,14 @@ BEGIN
   -- Use pg_net to call the Edge Function (if you have pg_net enabled)
   -- Uncomment below after enabling pg_net in Supabase Dashboard → Database → Extensions
   --
-  -- PERFORM net.http_post(
-  --   url := CONCAT(current_setting('app.settings.supabase_url'), '/functions/v1/notify-order'),
-  --   headers := jsonb_build_object(
-  --     'Content-Type', 'application/json',
-  --     'Authorization', CONCAT('Bearer ', current_setting('app.settings.service_role_key'))
-  --   ),
-  --   body := notification_payload
-  -- );
+  PERFORM net.http_post(
+    url := CONCAT(current_setting('app.settings.supabase_url'), '/functions/v1/notify-order'),
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', CONCAT('Bearer ', current_setting('app.settings.service_role_key'))
+    ),
+    body := notification_payload
+  );
 
   RETURN NEW;
 END;

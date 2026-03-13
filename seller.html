@@ -231,7 +231,15 @@
         border-radius: 2px;
       }
     }
-    
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -255,6 +263,9 @@
 
     // Initialize Supabase client
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Sanitization function for user input
+    const sanitize = (str) => str ? str.replace(/[<>]/g, '') : '';
 
     const { useState, useEffect, useCallback } = React;
     // =============================================
@@ -704,6 +715,13 @@
           // Validate file size
           if (file.size > MAX_FILE_SIZE) {
             setUploadError('Image too large. Maximum 5MB per image.');
+            setUploading(false);
+            return;
+          }
+
+          // Validate file size
+          if (file.size > 5 * 1024 * 1024) {
+            setUploadError('File size must be less than 5MB.');
             setUploading(false);
             return;
           }
@@ -1255,6 +1273,12 @@
           return;
         }
 
+        // Validate file size
+        if (file.size > 5 * 1024 * 1024) {
+          setError('File size must be less than 5MB.');
+          return;
+        }
+
         // Validate file type
         if (!ALLOWED_TYPES.includes(file.type)) {
           setError('Invalid image format. Please use JPEG, PNG, or WebP.');
@@ -1712,20 +1736,20 @@
     // CREATE LISTING SCREEN
     // =============================================
 
-    const CreateListingScreen = ({ profile, onBack, onSuccess }) => {
+    const CreateListingScreen = ({ profile, onBack, onSuccess, editingListing }) => {
       const isMobile = useIsMobile();
       const [loading, setLoading] = useState(false);
       const [error, setError] = useState('');
       const [showSuccess, setShowSuccess] = useState(false);
 
-      const [category, setCategory] = useState('');
-      const [title, setTitle] = useState('');
-      const [description, setDescription] = useState('');
-      const [price, setPrice] = useState('');
-      const [priceUnit, setPriceUnit] = useState('');
-      const [quantity, setQuantity] = useState('');
-      const [images, setImages] = useState([]);
-      const [growingMethod, setGrowingMethod] = useState('');
+      const [category, setCategory] = useState(editingListing?.category || '');
+      const [title, setTitle] = useState(editingListing?.title || '');
+      const [description, setDescription] = useState(editingListing?.description || '');
+      const [price, setPrice] = useState(editingListing?.price?.toString() || '');
+      const [priceUnit, setPriceUnit] = useState(editingListing?.price_unit || '');
+      const [quantity, setQuantity] = useState(editingListing?.quantity?.toString() || '');
+      const [images, setImages] = useState(editingListing?.images || []);
+      const [growingMethod, setGrowingMethod] = useState(editingListing?.growing_method || '');
 
       const handleSubmit = async () => {
         setError('');
@@ -1778,20 +1802,36 @@
         setLoading(true);
 
         try {
-          const { error } = await supabase
-            .from('listings')
-            .insert([{
-              seller_id: profile.id,
-              title: title.trim(),
-              description: description.trim() || null,
-              category: category,
-              price: parseFloat(price),
-              price_unit: priceUnit,
-              quantity_available: quantity ? parseInt(quantity) : null,
-              images: images.length > 0 ? images : null,
-              growing_method: growingMethod || null,
-              is_available: true,
-            }]);
+          const listingData = {
+            title: title.trim(),
+            description: description.trim() || null,
+            category: category,
+            price: parseFloat(price),
+            price_unit: priceUnit,
+            quantity_available: quantity ? parseInt(quantity) : null,
+            images: images.length > 0 ? images : null,
+            growing_method: growingMethod || null,
+          };
+
+          let error;
+          if (editingListing) {
+            // Update existing listing
+            const result = await supabase
+              .from('listings')
+              .update(listingData)
+              .eq('id', editingListing.id);
+            error = result.error;
+          } else {
+            // Create new listing
+            const result = await supabase
+              .from('listings')
+              .insert([{
+                ...listingData,
+                seller_id: profile.id,
+                is_available: true,
+              }]);
+            error = result.error;
+          }
 
           if (error) throw error;
           setShowSuccess(true);
@@ -1828,7 +1868,7 @@
                 }}
               >←</button>
               <h1 style={{ fontSize: 24, fontWeight: 700, color: colors.dark }}>
-                Create Listing 🌱
+                {editingListing ? 'Edit Listing ✏️' : 'Create Listing 🌱'}
               </h1>
             </div>
 
@@ -1980,7 +2020,7 @@
                 fullWidth
                 style={{ marginTop: 12 }}
               >
-                Publish Listing 🚀
+                {editingListing ? 'Update Listing 📝' : 'Publish Listing 🚀'}
               </Button>
             </Card>
           </div>
@@ -2098,16 +2138,17 @@
     // DASHBOARD SCREEN
     // =============================================
 
-    const DashboardScreen = ({ user, profile, onLogout, onEditProfile, onCreateListing }) => {
+    const DashboardScreen = ({ user, profile, onLogout, onEditProfile, onCreateListing, onEditListing }) => {
       const isMobile = useIsMobile();
       const [listings, setListings] = useState([]);
       const [orders, setOrders] = useState([]);
       const [loading, setLoading] = useState(true);
       const [showConfetti, setShowConfetti] = useState(false);
       const [alert, setAlert] = useState(null);
-      const [activeTab, setActiveTab] = useState('listings'); // 'listings' or 'orders'
+      const [activeTab, setActiveTab] = useState('listings'); // 'listings', 'orders', or 'analytics'
       const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
       const [deleteConfirm, setDeleteConfirm] = useState({ show: false, listing: null });
+      const [statusFilter, setStatusFilter] = useState('all'); // for filtering orders by status
 
       const fetchListings = async () => {
         const { data, error } = await supabase
@@ -2342,7 +2383,7 @@
             </div>
 
             {/* Tab Buttons */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
               <button
                 onClick={() => setActiveTab('listings')}
                 style={{
@@ -2357,6 +2398,7 @@
                   cursor: 'pointer',
                   boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
                   fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  minWidth: isMobile ? '48%' : 'auto',
                 }}
               >
                 📦 Listings ({listings.length})
@@ -2376,6 +2418,7 @@
                   boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
                   fontFamily: 'Plus Jakarta Sans, sans-serif',
                   position: 'relative',
+                  minWidth: isMobile ? '48%' : 'auto',
                 }}
               >
                 🛒 Orders ({orders.length})
@@ -2399,12 +2442,59 @@
                   </span>
                 )}
               </button>
+              <button
+                onClick={() => setActiveTab('analytics')}
+                style={{
+                  flex: 1,
+                  padding: '14px 20px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: activeTab === 'analytics' ? colors.gradient1 : colors.white,
+                  color: activeTab === 'analytics' ? colors.white : colors.dark,
+                  fontWeight: 600,
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  minWidth: isMobile ? '48%' : 'auto',
+                }}
+              >
+                📊 Analytics
+              </button>
             </div>
 
             {/* Content based on tab */}
             {activeTab === 'orders' ? (
               /* Orders Tab */
               <div style={{ marginBottom: 32 }}>
+                {/* Status Filter Dropdown */}
+                {orders.length > 0 && (
+                  <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <label style={{ fontWeight: 600, color: colors.dark, fontSize: 14 }}>Filter by Status:</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      style={{
+                        padding: '10px 16px',
+                        borderRadius: 8,
+                        border: `1px solid ${colors.gray}`,
+                        background: colors.white,
+                        color: colors.dark,
+                        fontWeight: 500,
+                        fontSize: 14,
+                        cursor: 'pointer',
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                      }}
+                    >
+                      <option value="all">All Orders</option>
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                    </select>
+                  </div>
+                )}
+
                 {loading ? (
                   <Card style={{ textAlign: 'center', padding: 40 }}>
                     <Spinner size={32} />
@@ -2421,23 +2511,30 @@
                     </p>
                   </Card>
                 ) : (
-                  orders.map(order => (
+                  orders
+                    .filter(order => statusFilter === 'all' || order.status === statusFilter)
+                    .map(order => (
                     <Card key={order.id} style={{ marginBottom: 16, padding: 24 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                         <div>
                           <span style={{
-                            padding: '4px 12px',
+                            padding: '6px 12px',
                             borderRadius: 20,
                             fontSize: 12,
                             fontWeight: 600,
                             background: order.status === 'pending' ? colors.accent :
-                                       order.status === 'confirmed' ? colors.lavender :
+                                       order.status === 'confirmed' ? colors.primary :
+                                       order.status === 'shipped' ? colors.lavender :
                                        order.status === 'delivered' ? colors.mint : colors.lightGray,
                             color: order.status === 'pending' ? colors.dark : colors.white,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
                           }}>
-                            {order.status === 'pending' ? '🆕 New Order' :
+                            {order.status === 'pending' ? '🆕 Pending' :
                              order.status === 'confirmed' ? '✓ Confirmed' :
-                             order.status === 'delivered' ? '📦 Delivered' : order.status}
+                             order.status === 'shipped' ? '📮 Shipped' :
+                             order.status === 'delivered' ? '✅ Delivered' : order.status}
                           </span>
                           <p style={{ fontSize: 12, color: colors.gray, marginTop: 8 }}>
                             {new Date(order.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -2450,7 +2547,7 @@
 
                       {/* Items */}
                       <div style={{ background: colors.cream, borderRadius: 12, padding: 16, marginBottom: 16 }}>
-                        {order.items.map((item, i) => (
+                        {Array.isArray(order.items) && order.items.map((item, i) => (
                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: i < order.items.length - 1 ? 8 : 0 }}>
                             <span style={{ color: colors.dark }}>{item.title} × {item.quantity}</span>
                             <span style={{ fontWeight: 600, color: colors.dark }}>฿{(item.price * item.quantity).toFixed(0)}</span>
@@ -2461,13 +2558,13 @@
                       {/* Customer Info */}
                       <div style={{ marginBottom: 16 }}>
                         <p style={{ fontWeight: 600, color: colors.dark, marginBottom: 8 }}>
-                          👤 {order.customer_name}
+                          👤 {sanitize(order.customer_name)}
                         </p>
                         <p style={{ fontSize: 14, color: colors.gray, marginBottom: 4 }}>
                           📱 {order.customer_phone}
                         </p>
                         <p style={{ fontSize: 14, color: colors.gray }}>
-                          📍 {order.address}, {order.district}, {order.province} {order.postal_code}
+                          📍 {sanitize(order.address)}, {sanitize(order.district)}, {sanitize(order.province)} {order.postal_code}
                         </p>
                         {order.delivery_notes && (
                           <p style={{ fontSize: 14, color: colors.lavender, marginTop: 8 }}>
@@ -2496,16 +2593,220 @@
                       )}
                       {order.status === 'confirmed' && (
                         <Button
+                          onClick={() => updateOrderStatus(order.id, 'shipped')}
+                          fullWidth
+                          style={{ padding: '12px 16px', fontSize: 14 }}
+                        >
+                          📮 Mark as Shipped
+                        </Button>
+                      )}
+                      {order.status === 'shipped' && (
+                        <Button
                           variant="success"
                           onClick={() => updateOrderStatus(order.id, 'delivered')}
                           fullWidth
                           style={{ padding: '12px 16px', fontSize: 14 }}
                         >
-                          📦 Mark as Delivered
+                          ✅ Mark as Delivered
                         </Button>
+                      )}
+                      {order.status === 'delivered' && (
+                        <div style={{
+                          padding: '12px 16px',
+                          background: colors.mint,
+                          color: colors.white,
+                          borderRadius: 8,
+                          textAlign: 'center',
+                          fontWeight: 600,
+                          fontSize: 14,
+                        }}>
+                          ✅ Completed
+                        </div>
                       )}
                     </Card>
                   ))
+                )}
+              </div>
+            ) : activeTab === 'analytics' ? (
+              /* Analytics Tab */
+              <div style={{ marginBottom: 32 }}>
+                {loading ? (
+                  <Card style={{ textAlign: 'center', padding: 40 }}>
+                    <Spinner size={32} />
+                    <p style={{ color: colors.gray, marginTop: 12 }}>Loading analytics...</p>
+                  </Card>
+                ) : (
+                  <div>
+                    {/* Stats Cards Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
+                      {/* Total Revenue */}
+                      <Card style={{ padding: 20 }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: colors.gray, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Revenue</p>
+                        <p style={{ fontSize: 32, fontWeight: 800, color: colors.primary, marginBottom: 4 }}>
+                          ฿{orders.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0).toFixed(0)}
+                        </p>
+                        <p style={{ fontSize: 12, color: colors.gray }}>From {orders.length} orders</p>
+                      </Card>
+
+                      {/* Total Orders */}
+                      <Card style={{ padding: 20 }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: colors.gray, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Orders</p>
+                        <p style={{ fontSize: 32, fontWeight: 800, color: colors.secondary, marginBottom: 4 }}>
+                          {orders.length}
+                        </p>
+                        <p style={{ fontSize: 12, color: colors.gray }}>All time</p>
+                      </Card>
+
+                      {/* Active Listings */}
+                      <Card style={{ padding: 20 }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: colors.gray, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Active Listings</p>
+                        <p style={{ fontSize: 32, fontWeight: 800, color: colors.mint, marginBottom: 4 }}>
+                          {listings.filter(l => l.is_available).length}
+                        </p>
+                        <p style={{ fontSize: 12, color: colors.gray }}>Out of {listings.length}</p>
+                      </Card>
+
+                      {/* Average Order Value */}
+                      <Card style={{ padding: 20 }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: colors.gray, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Avg Order Value</p>
+                        <p style={{ fontSize: 32, fontWeight: 800, color: colors.lavender, marginBottom: 4 }}>
+                          ฿{orders.length > 0 ? (orders.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0) / orders.length).toFixed(0) : 0}
+                        </p>
+                        <p style={{ fontSize: 12, color: colors.gray }}>Per order</p>
+                      </Card>
+                    </div>
+
+                    {/* Orders by Day Chart */}
+                    {orders.length > 0 && (
+                      <Card style={{ padding: 24, marginBottom: 24 }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 20 }}>Orders by Day (Last 7 Days)</h3>
+                        {(() => {
+                          const last7Days = Array.from({length: 7}, (_, i) => {
+                            const d = new Date();
+                            d.setDate(d.getDate() - (6 - i));
+                            return d;
+                          });
+                          const ordersByDay = last7Days.map(day => ({
+                            label: day.toLocaleDateString('en', {weekday: 'short'}),
+                            count: orders.filter(o => {
+                              const od = new Date(o.created_at);
+                              return od.toDateString() === day.toDateString();
+                            }).length
+                          }));
+                          const maxCount = Math.max(...ordersByDay.map(d => d.count), 1);
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 200 }}>
+                              {ordersByDay.map((day, idx) => (
+                                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                                  <div style={{
+                                    width: '100%',
+                                    height: `${(day.count / maxCount) * 150}px`,
+                                    background: colors.gradient1,
+                                    borderRadius: '8px 8px 0 0',
+                                    boxShadow: shadows.soft,
+                                  }}></div>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: colors.dark, textAlign: 'center' }}>{day.label}</div>
+                                  <div style={{ fontSize: 14, fontWeight: 700, color: colors.primary }}>{day.count}</div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </Card>
+                    )}
+
+                    {/* Top Listings */}
+                    {orders.length > 0 && (
+                      <Card style={{ padding: 24, marginBottom: 24 }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 20 }}>Top 3 Products</h3>
+                        {(() => {
+                          const itemCounts = {};
+                          orders.forEach(order => {
+                            if (Array.isArray(order.items)) {
+                              order.items.forEach(item => {
+                                if (!itemCounts[item.title]) {
+                                  itemCounts[item.title] = { title: item.title, count: 0, total: 0, image: item.image };
+                                }
+                                itemCounts[item.title].count += item.quantity || 1;
+                                itemCounts[item.title].total += (item.price * (item.quantity || 1)) || 0;
+                              });
+                            }
+                          });
+                          const topItems = Object.values(itemCounts)
+                            .sort((a, b) => b.count - a.count)
+                            .slice(0, 3);
+                          return (
+                            <div>
+                              {topItems.length === 0 ? (
+                                <p style={{ color: colors.gray }}>No product data available</p>
+                              ) : (
+                                topItems.map((item, idx) => (
+                                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: idx < topItems.length - 1 ? 16 : 0, paddingBottom: idx < topItems.length - 1 ? 16 : 0, borderBottom: idx < topItems.length - 1 ? `1px solid ${colors.lightGray}` : 'none' }}>
+                                    <div style={{ fontSize: 28, fontWeight: 700, color: colors.primary, minWidth: 40, textAlign: 'center' }}>#{idx + 1}</div>
+                                    <div style={{ flex: 1 }}>
+                                      <p style={{ fontWeight: 600, color: colors.dark, marginBottom: 4 }}>{item.title}</p>
+                                      <p style={{ fontSize: 14, color: colors.gray }}>{item.count} {item.count === 1 ? 'unit' : 'units'} • ฿{item.total.toFixed(0)} revenue</p>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </Card>
+                    )}
+
+                    {/* Revenue Breakdown by Payment Method */}
+                    {orders.length > 0 && (
+                      <Card style={{ padding: 24 }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 20 }}>Revenue by Payment Method</h3>
+                        {(() => {
+                          const paymentBreakdown = {
+                            cod: { label: 'Cash on Delivery', amount: 0 },
+                            promptpay: { label: 'PromptPay', amount: 0 }
+                          };
+                          orders.forEach(order => {
+                            const method = (order.payment_method || 'cod').toLowerCase();
+                            if (paymentBreakdown[method]) {
+                              paymentBreakdown[method].amount += parseFloat(order.total) || 0;
+                            }
+                          });
+                          const totalRevenue = Object.values(paymentBreakdown).reduce((sum, p) => sum + p.amount, 0);
+                          return (
+                            <div>
+                              {Object.entries(paymentBreakdown).map(([key, method], idx) => {
+                                const percentage = totalRevenue > 0 ? ((method.amount / totalRevenue) * 100).toFixed(1) : 0;
+                                return (
+                                  <div key={key} style={{ marginBottom: idx === Object.keys(paymentBreakdown).length - 1 ? 0 : 16 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                      <p style={{ fontWeight: 600, color: colors.dark }}>{method.label}</p>
+                                      <p style={{ fontSize: 14, fontWeight: 700, color: colors.primary }}>฿{method.amount.toFixed(0)}</p>
+                                    </div>
+                                    <div style={{ width: '100%', height: 8, background: colors.lightGray, borderRadius: 4, overflow: 'hidden' }}>
+                                      <div style={{ width: `${percentage}%`, height: '100%', background: key === 'promptpay' ? colors.lavender : colors.secondary, borderRadius: 4 }}></div>
+                                    </div>
+                                    <p style={{ fontSize: 12, color: colors.gray, marginTop: 4 }}>{percentage}% of total</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </Card>
+                    )}
+
+                    {orders.length === 0 && (
+                      <Card style={{ textAlign: 'center', padding: 48 }}>
+                        <div style={{ fontSize: 64, marginBottom: 16 }}>📊</div>
+                        <h3 style={{ fontSize: 20, fontWeight: 600, color: colors.dark, marginBottom: 8 }}>
+                          No data yet
+                        </h3>
+                        <p style={{ color: colors.gray }}>
+                          Analytics will appear here once you receive your first order!
+                        </p>
+                      </Card>
+                    )}
+                  </div>
                 )}
               </div>
             ) : (
@@ -2535,7 +2836,7 @@
                   <ListingCard
                     key={listing.id}
                     listing={listing}
-                    onEdit={() => {/* TODO: Implement edit */}}
+                    onEdit={onEditListing}
                     onToggleAvailability={handleToggleAvailability}
                     onDelete={handleDelete}
                   />
@@ -2644,6 +2945,7 @@
       const [loading, setLoading] = useState(true);
       const [screen, setScreen] = useState('loading'); // loading, auth, setup, dashboard, create-listing
       const [isNewUser, setIsNewUser] = useState(false);
+      const [editingListing, setEditingListing] = useState(null);
 
       // Check for existing session
       useEffect(() => {
@@ -2813,8 +3115,15 @@
         return (
           <CreateListingScreen
             profile={profile}
-            onBack={() => navigateTo('dashboard')}
-            onSuccess={() => navigateTo('dashboard')}
+            onBack={() => {
+              setEditingListing(null);
+              navigateTo('dashboard');
+            }}
+            onSuccess={() => {
+              setEditingListing(null);
+              navigateTo('dashboard');
+            }}
+            editingListing={editingListing}
           />
         );
       }
@@ -2826,7 +3135,14 @@
           profile={profile}
           onLogout={handleLogout}
           onEditProfile={() => navigateTo('setup')}
-          onCreateListing={() => navigateTo('create-listing')}
+          onCreateListing={() => {
+            setEditingListing(null);
+            navigateTo('create-listing');
+          }}
+          onEditListing={(listing) => {
+            setEditingListing(listing);
+            navigateTo('create-listing');
+          }}
         />
       );
     };

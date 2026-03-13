@@ -22,6 +22,7 @@ interface OrderPayload {
   vendor_name: string;
   vendor_email: string | null;
   line_notify_token: string | null;
+  payment_method: string;
   created_at: string;
 }
 
@@ -38,6 +39,8 @@ async function sendEmail(payload: OrderPayload): Promise<boolean> {
         .join("\n")
     : "See dashboard for details";
 
+  const paymentMethodDisplay = payload.payment_method === 'promptpay' ? 'PromptPay' : 'Cash on Delivery';
+
   const html = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #2D7D46 0%, #4CAF50 100%); padding: 32px; border-radius: 16px 16px 0 0;">
@@ -53,7 +56,7 @@ async function sendEmail(payload: OrderPayload): Promise<boolean> {
           <p style="margin: 0 0 8px;"><strong>Phone:</strong> ${payload.buyer_phone}</p>
           <p style="margin: 0 0 8px;"><strong>Delivery:</strong> ${payload.delivery_address}</p>
           <p style="margin: 0 0 8px;"><strong>Total:</strong> ฿${payload.total_amount}</p>
-          <p style="margin: 0;"><strong>Payment:</strong> Cash on Delivery</p>
+          <p style="margin: 0;"><strong>Payment:</strong> ${paymentMethodDisplay}</p>
         </div>
 
         <div style="background: #E8F5E9; padding: 16px; border-radius: 12px; margin: 20px 0;">
@@ -113,7 +116,7 @@ Customer: ${payload.buyer_name}
 Phone: ${payload.buyer_phone}
 Total: ฿${payload.total_amount}
 Delivery: ${payload.delivery_address}
-Payment: Cash on Delivery
+Payment: ${paymentMethodDisplay}
 
 Open your vendor dashboard to view details:
 https://siamclones.com/seller.html`;
@@ -142,16 +145,24 @@ https://siamclones.com/seller.html`;
   }
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 // ---- Main handler ----
 serve(async (req: Request) => {
   // CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-      },
+      headers: corsHeaders,
     });
+  }
+
+  // Authorization check
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
   }
 
   try {
@@ -173,14 +184,14 @@ serve(async (req: Request) => {
         line_sent: lineResult,
       }),
       {
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (e) {
     console.error("Handler error:", e);
     return new Response(
       JSON.stringify({ error: (e as Error).message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
