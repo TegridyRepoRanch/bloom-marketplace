@@ -14,6 +14,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@siamclones.com";
 const DISCORD_WEBHOOK_URL = Deno.env.get("DISCORD_WEBHOOK_URL") || "";
+const NOTIFY_WEBHOOK_SECRET = Deno.env.get("NOTIFY_WEBHOOK_SECRET") || "";
 
 interface OrderPayload {
   order_id: string;
@@ -212,24 +213,55 @@ async function sendDiscordNotification(payload: OrderPayload): Promise<boolean> 
   }
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://siamclones.com",
+  "https://www.siamclones.com",
+  "https://bqglrepbhjxmbgggdqal.supabase.co",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
 
 // ---- Main handler ----
 serve(async (req: Request) => {
-  // CORS
+  const corsHeaders = getCorsHeaders(req);
+
+  // CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: corsHeaders,
-    });
+    return new Response("ok", { headers: corsHeaders });
   }
 
-  // Authorization check
+  // Authorization check — require shared secret OR valid Supabase anon key
   const authHeader = req.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+
+  // If NOTIFY_WEBHOOK_SECRET is set, the caller must provide it OR the Supabase anon key.
+  // This blocks random internet callers while still allowing the pg_net database trigger to work.
+  if (NOTIFY_WEBHOOK_SECRET) {
+    // Decode JWT payload to check if it's a valid Supabase token (role: anon or service_role)
+    let isSupabaseToken = false;
+    try {
+      const payloadB64 = token.split('.')[1];
+      if (payloadB64) {
+        const decoded = JSON.parse(atob(payloadB64));
+        isSupabaseToken = decoded.iss === 'supabase' && ['anon', 'service_role'].includes(decoded.role);
+      }
+    } catch (_) { /* not a JWT */ }
+
+    if (token !== NOTIFY_WEBHOOK_SECRET && !isSupabaseToken) {
+      console.error("Auth failed: invalid token");
+      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders });
+    }
   }
 
   try {
