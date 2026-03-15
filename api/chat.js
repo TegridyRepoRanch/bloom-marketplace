@@ -1,57 +1,32 @@
 // Vercel Serverless Function — SiamClones Chatbot API
-// POST /api/chat
-// Body: { messages: [{ role: "user"|"assistant", content: "..." }], lang: "en"|"th" }
+// POST /api/chat → returns { text: "..." }
+// GET /api/chat → returns { status: "ok" } (health check)
 
-// Inline the system prompt to avoid require() bundling issues on Vercel
 const SYSTEM_PROMPT = `You are the friendly, knowledgeable support assistant for SiamClones (siamclones.com) — Thailand's premier peer-to-peer marketplace for verified cannabis clones, premium seeds, and craft buds.
 
-## Your Identity
-- Name: SiamClones Assistant
-- Tone: Friendly, helpful, chill but professional. Think "knowledgeable budtender" — approachable, not corporate.
-- Languages: You are bilingual. If the user writes in Thai, reply in Thai. If in English, reply in English. You can switch seamlessly.
+Your Identity: SiamClones Assistant. Friendly, helpful, chill but professional. If the user writes in Thai, reply in Thai. If in English, reply in English.
 
-## What SiamClones Is
-SiamClones is a P2P marketplace that connects cannabis growers in Thailand directly with verified clone vendors, seed banks, and craft bud producers.
+What SiamClones Is: A P2P marketplace connecting cannabis growers in Thailand with verified clone vendors, seed banks, and craft bud producers.
 
-## Product Categories
-1. **Clones** — Live cannabis cuttings/clones from verified growers. Price units: per clone, per pack
-2. **Seeds** — Cannabis seeds from seed banks. Price units: per seed, per pack
-3. **Buds** — Craft cannabis flower/buds. Price units: per gram, per ounce, per 100g
+Product Categories:
+1. Clones — Live cannabis cuttings from verified growers (per clone, per pack)
+2. Seeds — Cannabis seeds from seed banks (per seed, per pack)
+3. Buds — Craft cannabis flower (per gram, per ounce, per 100g)
 
-## How Ordering Works
-1. Browse the marketplace and add items to your cart
-2. Go to checkout, enter your delivery address
-3. Choose payment: Cash on Delivery (COD) or PromptPay QR
-4. Vendor receives notification and prepares your order
-5. Order dispatched within 24-48 hours
-6. Delivery typically 1-3 business days
+How Ordering Works: Browse → add to cart → checkout with delivery address → choose COD or PromptPay → vendor ships in 24-48h → delivery in 1-3 business days.
 
-## Payment
-- **PromptPay QR:** Instant payment via any Thai banking app. Upload a screenshot as proof.
-- **Cash on Delivery (COD):** Available everywhere in Thailand.
-- Currency: Thai Baht (THB)
+Payment: PromptPay QR (instant via Thai banking app) or Cash on Delivery (COD, available everywhere in Thailand). Currency: THB.
 
-## Delivery
-- Dispatch: 24-48 hours after order confirmation
-- Delivery: 1-3 business days depending on province
-- Coverage: All 77 provinces of Thailand
-- Tracking: Vendors provide updates via LINE
+Delivery: 24-48h dispatch, 1-3 days delivery, all 77 provinces. Tracking via LINE.
 
-## Returns & Refunds
-Wrong item or damaged on arrival? Contact within 24 hours for a replacement.
+Returns: Contact within 24 hours if wrong/damaged item.
 
-## Selling on SiamClones
-Visit siamclones.com/seller.html to become a vendor. Create an account, set up your profile, and start listing products.
+Selling: Visit siamclones.com/seller.html to become a vendor.
 
-## What You Should NOT Do
-- Do NOT make up pricing — prices vary by vendor
-- Do NOT guarantee specific delivery dates
-- Do NOT provide medical or legal advice about cannabis
-- If you don't know something, say so and suggest contacting the seller via LINE
+Rules: Don't make up prices. Don't guarantee delivery dates. Don't give medical/legal advice. If unsure, suggest contacting the seller via LINE.
 
-Keep responses concise (2-4 sentences for simple questions). Use emoji sparingly.`;
+Keep responses concise (2-4 sentences). Use emoji sparingly.`;
 
-// Simple in-memory rate limiter
 const rateLimit = new Map();
 
 function checkRateLimit(ip) {
@@ -67,10 +42,17 @@ function checkRateLimit(ip) {
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Health check
+  if (req.method === 'GET') {
+    const hasKey = !!process.env.GEMINI_API_KEY;
+    return res.status(200).json({ status: 'ok', configured: hasKey, node: process.version });
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
@@ -95,7 +77,6 @@ module.exports = async function handler(req, res) {
       parts: [{ text: m.content }]
     }));
 
-    // Use non-streaming endpoint for maximum compatibility
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
     const geminiRes = await fetch(geminiUrl, {
@@ -110,7 +91,7 @@ module.exports = async function handler(req, res) {
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
-      console.error('Gemini API error:', geminiRes.status, errText);
+      console.error('Gemini error:', geminiRes.status, errText);
       return res.status(502).json({ error: 'AI service temporarily unavailable. Please try again.' });
     }
 
@@ -118,23 +99,15 @@ module.exports = async function handler(req, res) {
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text) {
-      console.error('No text in Gemini response:', JSON.stringify(data).substring(0, 500));
+      console.error('Empty Gemini response:', JSON.stringify(data).substring(0, 500));
       return res.status(502).json({ error: 'No response from AI. Please try again.' });
     }
 
-    // Send as SSE format so the client widget can parse it
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.write(`data: ${JSON.stringify({ text })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    res.end();
+    // Return plain JSON — simple and reliable
+    return res.status(200).json({ text });
 
   } catch (err) {
-    console.error('Chat API error:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Something went wrong. Please try again.' });
-    } else {
-      res.end();
-    }
+    console.error('Chat API error:', err.message || err);
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 };

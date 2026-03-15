@@ -364,44 +364,16 @@
         signal: abortController.signal
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('error'));
+        throw new Error(data.error || t('error'));
       }
 
-      // Start reading the stream
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let botMessage = { role: 'assistant', content: '' };
-      messages.push(botMessage);
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') continue;
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.text) {
-                botMessage.content += parsed.text;
-                renderMessages();
-              }
-            } catch (e) { /* skip */ }
-          }
-        }
-      }
-
-      // If empty response
-      if (!botMessage.content.trim()) {
-        botMessage.content = t('error');
+      if (data.text) {
+        messages.push({ role: 'assistant', content: data.text });
+      } else {
+        throw new Error(t('error'));
       }
 
     } catch (err) {
