@@ -1,6 +1,6 @@
 // SiamClones Service Worker — Cache-first for assets, network-first for API
 // Version bump: increment this on each deploy for cache busting
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 const CACHE_NAME = `siamclones-v${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
@@ -78,7 +78,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate for same-origin static assets
+  // Network-first for HTML pages (ensure fresh content after deploys)
+  if (url.origin === self.location.origin && (request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Stale-while-revalidate for same-origin static assets (JS, CSS, images)
   // Serve from cache immediately, update cache in background
   if (url.origin === self.location.origin) {
     event.respondWith(
