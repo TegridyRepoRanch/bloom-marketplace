@@ -1,6 +1,6 @@
-// SiamClones Service Worker — Cache-first for assets, network-first for API
+// SiamClones Service Worker — Network-first for HTML & CDN, cache for static assets
 // Version bump: increment this on each deploy for cache busting
-const CACHE_VERSION = 5;
+const CACHE_VERSION = 6;
 const CACHE_NAME = `siamclones-v${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
@@ -22,13 +22,25 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate — clean old caches
+// Activate — aggressively clean ALL old caches to prevent stale CDN issues
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       );
+    }).then(() => {
+      // Also purge any stale CDN entries from the NEW cache
+      // (in case old HTML pages with unpkg URLs were pre-cached)
+      return caches.open(CACHE_NAME).then((cache) => {
+        return cache.keys().then((requests) => {
+          return Promise.all(
+            requests
+              .filter((req) => req.url.includes('unpkg.com'))
+              .map((req) => cache.delete(req))
+          );
+        });
+      });
     })
   );
   self.clients.claim();
@@ -50,7 +62,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Cache successful GET responses for offline fallback
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
@@ -62,19 +73,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for CDN scripts (React, Babel, etc.) with caching
-  if (url.hostname === 'unpkg.com' || url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
+  // Network-only for CDN scripts — do NOT cache these
+  // CDNs have their own edge caching; caching in SW risks serving stale scripts
+  // after a CDN migration (e.g., unpkg → cdnjs)
+  if (
+    url.hostname === 'cdnjs.cloudflare.com' ||
+    url.hostname === 'cdn.jsdelivr.net' ||
+    url.hostname === 'unpkg.com' ||
+    url.hostname === 'fonts.googleapis.com' ||
+    url.hostname === 'fonts.gstatic.com'
+  ) {
+    event.respondWith(fetch(request));
     return;
   }
 
@@ -95,7 +104,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Stale-while-revalidate for same-origin static assets (JS, CSS, images)
-  // Serve from cache immediately, update cache in background
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(request).then((cached) => {
