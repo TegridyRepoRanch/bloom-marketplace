@@ -1,18 +1,18 @@
-// SiamClones Service Worker — Network-first for HTML & CDN, cache for static assets
+// SiamClones Service Worker — Network-only for HTML, cache for static assets
 // Version bump: increment this on each deploy for cache busting
-const CACHE_VERSION = 6;
+const CACHE_VERSION = 7;
 const CACHE_NAME = `siamclones-v${CACHE_VERSION}`;
+
+// Only cache non-HTML assets — HTML is always fetched from network
+// to prevent stale page loads that cause white screens
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/seller.html',
   '/favicon.svg',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
 ];
 
-// Install — pre-cache static shell
+// Install — pre-cache static assets (NOT HTML)
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -22,7 +22,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate — aggressively clean ALL old caches to prevent stale CDN issues
+// Activate — clean old caches + force-reload all open pages
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -30,20 +30,34 @@ self.addEventListener('activate', (event) => {
         keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       );
     }).then(() => {
-      // Also purge any stale CDN entries from the NEW cache
-      // (in case old HTML pages with unpkg URLs were pre-cached)
+      // Purge any stale CDN or HTML entries from the new cache
       return caches.open(CACHE_NAME).then((cache) => {
         return cache.keys().then((requests) => {
           return Promise.all(
             requests
-              .filter((req) => req.url.includes('unpkg.com'))
+              .filter((req) => {
+                const u = new URL(req.url);
+                return u.hostname !== self.location.hostname ||
+                       req.url.includes('unpkg.com') ||
+                       u.pathname.endsWith('.html') ||
+                       u.pathname === '/';
+              })
               .map((req) => cache.delete(req))
           );
         });
       });
+    }).then(() => {
+      return self.clients.claim();
+    }).then(() => {
+      // Force-reload all open pages so they get fresh HTML from the network.
+      // This works even if the old page has no controllerchange listener.
+      return self.clients.matchAll({ type: 'window' }).then((clients) => {
+        clients.forEach((client) => {
+          client.navigate(client.url);
+        });
+      });
     })
   );
-  self.clients.claim();
 });
 
 // Fetch strategy
@@ -74,8 +88,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Network-only for CDN scripts — do NOT cache these
-  // CDNs have their own edge caching; caching in SW risks serving stale scripts
-  // after a CDN migration (e.g., unpkg → cdnjs)
   if (
     url.hostname === 'cdnjs.cloudflare.com' ||
     url.hostname === 'cdn.jsdelivr.net' ||
@@ -87,19 +99,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for HTML pages (ensure fresh content after deploys)
-  if (url.origin === self.location.origin && (request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
+  // Network-only for HTML pages — NEVER serve cached HTML
+  // Stale cached HTML is the #1 cause of white-page bugs
+  if (request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname === '/') {
+    event.respondWith(fetch(request));
     return;
   }
 
