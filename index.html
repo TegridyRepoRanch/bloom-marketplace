@@ -994,7 +994,7 @@
             }
           }
         } catch (err) {
-          console.error('QR generation failed:', err);
+          // QR generation error handled silently
         }
       }, [promptpayId, amount, size]);
 
@@ -1638,7 +1638,7 @@
             query = query.eq('category', selectedCategory);
           }
 
-          const { data, error } = await query.order('created_at', { ascending: false });
+          const { data, error } = await query.order('created_at', { ascending: false }).limit(100);
           if (error) {
             setError(t('error_load'));
             setLoading(false);
@@ -2465,36 +2465,7 @@
         setError('');
 
         try {
-          // Batch validate product stock availability
-          const productIds = cart.map(item => item.product.id);
-          const { data: availabilityData, error: availError } = await supabase
-            .from('listings')
-            .select('id, quantity_available')
-            .in('id', productIds);
-
-          if (availError || !availabilityData) {
-            setError('Failed to verify product availability.');
-            setLoading(false);
-            return;
-          }
-
-          const availabilityMap = Object.fromEntries(
-            availabilityData.map(listing => [listing.id, listing.quantity_available])
-          );
-
-          for (const item of cart) {
-            const quantity = availabilityMap[item.product.id];
-            if (quantity === undefined) {
-              setError(`Product "${item.product.title}" no longer available.`);
-              setLoading(false);
-              return;
-            }
-            if (quantity < item.quantity) {
-              setError(`Only ${quantity} of "${item.product.title}" available.`);
-              setLoading(false);
-              return;
-            }
-          }
+          const sanitize = (str) => str ? str.replace(/[<>"'`\\]/g, '').trim() : '';
 
           let proofUrl = '';
 
@@ -2509,7 +2480,6 @@
               .upload(filePath, proofFile, { cacheControl: '3600', upsert: false });
 
             if (uploadError) {
-              console.error('Upload error:', uploadError);
               throw new Error('Failed to upload payment screenshot. Please try again.');
             }
 
@@ -2520,78 +2490,33 @@
             proofUrl = urlData?.publicUrl || '';
           }
 
-          // Fetch fresh prices from server in a single batched query to prevent client-side price tampering
-          const { data: freshListings, error: priceErr } = await supabase
-            .from('listings')
-            .select('id, price, seller_id, title, is_available')
-            .in('id', productIds);
+          // Atomic order placement — validates stock, decrements inventory, and inserts orders
+          // in a single database transaction to prevent overselling
+          const orderItems = cart.map(item => ({
+            listing_id: item.product.id,
+            quantity: item.quantity,
+          }));
 
-          if (priceErr || !freshListings) {
-            throw new Error('Could not verify prices for your cart items');
-          }
-
-          const priceMap = Object.fromEntries(
-            freshListings.map(listing => [listing.id, listing])
-          );
-
-          const verifiedCart = [];
-          for (const item of cart) {
-            const freshListing = priceMap[item.product.id];
-            if (!freshListing) {
-              throw new Error(`Could not verify price for "${item.product.title}"`);
-            }
-            if (freshListing.is_available === false) {
-              throw new Error(`"${item.product.title}" is no longer available`);
-            }
-            verifiedCart.push({
-              ...item,
-              verifiedPrice: parseFloat(freshListing.price),
-              verifiedSellerId: freshListing.seller_id,
-              verifiedTitle: freshListing.title,
-            });
-          }
-
-          // Group items by seller using verified data
-          const sellerOrders = {};
-          verifiedCart.forEach(item => {
-            const sellerId = item.verifiedSellerId;
-            if (!sellerOrders[sellerId]) sellerOrders[sellerId] = [];
-            sellerOrders[sellerId].push({
-              listing_id: item.product.id,
-              title: item.verifiedTitle,
-              price: item.verifiedPrice,
-              quantity: item.quantity,
-            });
+          const { data: rpcResult, error: rpcError } = await supabase.rpc('place_order_atomic', {
+            p_items: orderItems,
+            p_customer_name: sanitize(name),
+            p_customer_phone: sanitize(phone),
+            p_address: sanitize(address),
+            p_district: sanitize(district),
+            p_province: sanitize(province),
+            p_postal_code: sanitize(postalCode),
+            p_delivery_notes: sanitize(notes || ''),
+            p_payment_method: paymentMethod,
+            p_payment_proof_url: proofUrl || null,
           });
 
-          const sanitize = (str) => str ? str.replace(/[<>"'`\\]/g, '').trim() : '';
-
-          // Create an order for each seller
-          for (const [sellerId, items] of Object.entries(sellerOrders)) {
-            const orderTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-            const { error: orderError } = await supabase
-              .from('orders')
-              .insert([{
-                items: items,
-                total: orderTotal,
-                customer_name: sanitize(name),
-                customer_phone: phone,
-                address: sanitize(address),
-                district: sanitize(district),
-                province: province,
-                postal_code: postalCode,
-                delivery_notes: sanitize(notes || ''),
-                seller_id: sellerId,
-                payment_method: paymentMethod,
-                payment_proof_url: proofUrl || null,
-                status: 'pending',
-              }]);
-
-            if (orderError) {
-              console.error('Order error:', orderError);
-              throw orderError;
+          if (rpcError) {
+            // Parse user-friendly error messages from the RPC
+            const msg = rpcError.message || '';
+            if (msg.includes('no longer available') || msg.includes('Only ') || msg.includes('not found')) {
+              throw new Error(msg);
             }
+            throw new Error('Failed to place order. Please try again.');
           }
 
           onPlaceOrder({ name, phone, address, district, province, postalCode, notes, paymentMethod, total });
@@ -3040,7 +2965,7 @@
       }
 
       componentDidCatch(error, errorInfo) {
-        console.error('Error caught by boundary:', error, errorInfo);
+        // Error details intentionally not logged to prevent info leaks in production
       }
 
       render() {
@@ -3057,10 +2982,10 @@
             }}>
               <span style={{ fontSize: 80, marginBottom: 20 }} aria-hidden="true">⚠️</span>
               <h1 style={{ fontSize: 32, fontWeight: 800, color: colors.dark, marginBottom: 16, textAlign: 'center' }}>
-                {t('error_generic')}
+                Something went wrong / เกิดข้อผิดพลาด
               </h1>
               <p style={{ fontSize: 16, color: colors.gray, marginBottom: 32, textAlign: 'center', maxWidth: 500 }}>
-                {t('error_apologize')}
+                We're sorry for the inconvenience. Please reload the page.<br/>ขออภัยในความไม่สะดวก กรุณาโหลดหน้าใหม่
               </p>
               <button
                 onClick={() => window.location.reload()}
@@ -3076,7 +3001,7 @@
                   fontFamily: 'Plus Jakarta Sans, sans-serif',
                 }}
               >
-                Reload Page
+                Reload Page / โหลดใหม่
               </button>
             </div>
           );
@@ -3199,7 +3124,7 @@
       useEffect(() => {
         const fetchVendors = async () => {
           setError(null);
-          const { data, error } = await supabase.from('profiles').select('*').eq('is_active', true);
+          const { data, error } = await supabase.from('profiles').select('*').eq('is_active', true).limit(100);
           if (error) {
             setError('Unable to load vendors. Please try again.');
             setLoading(false);
@@ -3377,6 +3302,34 @@
     // =============================================
     const ContactPage = ({ t = (key) => key }) => {
       const [sent, setSent] = useState(false);
+      const [sending, setSending] = useState(false);
+      const [contactName, setContactName] = useState('');
+      const [contactEmail, setContactEmail] = useState('');
+      const [contactMessage, setContactMessage] = useState('');
+      const [error, setError] = useState('');
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (sending) return;
+        setSending(true);
+        setError('');
+        try {
+          const sanitize = (str) => str ? str.replace(/[<>"'`\\]/g, '').trim() : '';
+          const { error: insertError } = await supabase
+            .from('leads')
+            .insert([{
+              contact: sanitize(contactEmail),
+              name: sanitize(contactName),
+              message: sanitize(contactMessage),
+            }]);
+          if (insertError) throw insertError;
+          setSent(true);
+        } catch (err) {
+          setError(t('contact_error') !== 'contact_error' ? t('contact_error') : 'Failed to send message. Please try again.');
+        }
+        setSending(false);
+      };
+
       return (
         <section style={{ minHeight: '100vh', padding: '120px 24px 80px', background: colors.cream }}>
           <div style={{ maxWidth: 600, margin: '0 auto' }}>
@@ -3390,12 +3343,13 @@
                   <h3 style={{ fontSize: 24, fontWeight: 700, color: colors.dark, marginTop: 20 }}>Message Sent!</h3>
                 </div>
               ) : (
-                <form onSubmit={(e) => { e.preventDefault(); setSent(true); }}>
-                  <input type="text" placeholder="Name" required style={{ width: '100%', padding: 16, borderRadius: 12, border: `2px solid ${colors.blush}`, marginBottom: 16, fontSize: 16, fontFamily: 'Plus Jakarta Sans' }} />
-                  <input type="email" placeholder="Email" required style={{ width: '100%', padding: 16, borderRadius: 12, border: `2px solid ${colors.blush}`, marginBottom: 16, fontSize: 16, fontFamily: 'Plus Jakarta Sans' }} />
-                  <textarea placeholder="Message" rows={4} required style={{ width: '100%', padding: 16, borderRadius: 12, border: `2px solid ${colors.blush}`, marginBottom: 24, fontSize: 16, fontFamily: 'Plus Jakarta Sans', resize: 'vertical' }} />
-                  <button type="submit" style={{ width: '100%', padding: 18, borderRadius: 30, border: 'none', background: colors.gradient1, color: colors.white, fontWeight: 700, fontSize: 18, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans', boxShadow: '0 8px 30px rgba(45, 125, 70, 0.4)' }}>
-                    Send Message 🚀
+                <form onSubmit={handleSubmit}>
+                  {error && <p style={{ color: colors.error, marginBottom: 16, fontSize: 14 }}>{error}</p>}
+                  <input type="text" placeholder="Name" required value={contactName} onChange={(e) => setContactName(e.target.value)} style={{ width: '100%', padding: 16, borderRadius: 12, border: `2px solid ${colors.blush}`, marginBottom: 16, fontSize: 16, fontFamily: 'Plus Jakarta Sans' }} />
+                  <input type="email" placeholder="Email" required value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} style={{ width: '100%', padding: 16, borderRadius: 12, border: `2px solid ${colors.blush}`, marginBottom: 16, fontSize: 16, fontFamily: 'Plus Jakarta Sans' }} />
+                  <textarea placeholder="Message" rows={4} required value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} style={{ width: '100%', padding: 16, borderRadius: 12, border: `2px solid ${colors.blush}`, marginBottom: 24, fontSize: 16, fontFamily: 'Plus Jakarta Sans', resize: 'vertical' }} />
+                  <button type="submit" disabled={sending} style={{ width: '100%', padding: 18, borderRadius: 30, border: 'none', background: sending ? colors.lightGray : colors.gradient1, color: colors.white, fontWeight: 700, fontSize: 18, cursor: sending ? 'not-allowed' : 'pointer', fontFamily: 'Plus Jakarta Sans', boxShadow: '0 8px 30px rgba(45, 125, 70, 0.4)' }}>
+                    {sending ? 'Sending...' : 'Send Message'}
                   </button>
                 </form>
               )}
@@ -3586,10 +3540,19 @@
     );
   </script>
   <script>
-    // Register service worker for PWA
+    // Register service worker for PWA with forced update
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+          .then((reg) => {
+            reg.update().catch(() => {});
+            setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000);
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              if (!refreshing) { refreshing = true; window.location.reload(); }
+            });
+          })
+          .catch(() => {});
       });
     }
   </script>

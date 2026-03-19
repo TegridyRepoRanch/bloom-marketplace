@@ -269,8 +269,14 @@
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       // Italic
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Links
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      // Links — protocol allowlist to prevent javascript: XSS
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, text, url) {
+        const trimmed = url.trim().toLowerCase();
+        if (trimmed.startsWith('https://') || trimmed.startsWith('http://') || trimmed.startsWith('mailto:')) {
+          return '<a href="' + url + '" target="_blank" rel="noopener">' + text + '</a>';
+        }
+        return text; // Strip unsafe links, keep text
+      })
       // Unordered lists
       .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
       .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')

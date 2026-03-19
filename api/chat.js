@@ -27,10 +27,22 @@ Rules: Don't make up prices. Don't guarantee delivery dates. Don't give medical/
 
 Keep responses concise (2-4 sentences). Use emoji sparingly.`;
 
+const MAX_RATE_LIMIT_ENTRIES = 10000;
 const rateLimit = new Map();
 
 function checkRateLimit(ip) {
   const now = Date.now();
+
+  // LRU eviction: if Map grows too large, clear oldest entries
+  if (rateLimit.size > MAX_RATE_LIMIT_ENTRIES) {
+    const cutoff = now - 60000;
+    for (const [key, val] of rateLimit) {
+      if (val.start < cutoff) rateLimit.delete(key);
+    }
+    // If still too large after cleanup, clear everything
+    if (rateLimit.size > MAX_RATE_LIMIT_ENTRIES) rateLimit.clear();
+  }
+
   const entry = rateLimit.get(ip);
   if (!entry || now - entry.start > 60000) {
     rateLimit.set(ip, { start: now, count: 1 });
@@ -61,7 +73,8 @@ module.exports = async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+  // Use x-real-ip (set by Vercel, not spoofable) as primary, fall back to x-forwarded-for
+  const ip = req.headers['x-real-ip'] || (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
   if (!checkRateLimit(ip)) {
     return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
   }
@@ -72,15 +85,23 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { messages } = req.body || {};
+    const body = req.body || {};
+    const { messages, lang } = body;
+
+    // Reject oversized request bodies
+    if (JSON.stringify(body).length > 50000) {
+      return res.status(413).json({ error: 'Request too large' });
+    }
+
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'Messages array is required' });
     }
 
+    // Cap messages to prevent excessive token usage
     const recentMessages = messages.slice(-20);
     const contents = recentMessages.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
+      parts: [{ text: String(m.content || '').slice(0, 2000) }]
     }));
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
@@ -90,7 +111,7 @@ module.exports = async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents,
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT + (lang === 'th' ? '\n\nIMPORTANT: The user has selected Thai language. Please respond in Thai unless they write in English.' : '') }] },
         generationConfig: { temperature: 0.7, topP: 0.9, maxOutputTokens: 512 }
       })
     });
