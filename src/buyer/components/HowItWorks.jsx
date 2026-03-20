@@ -21,7 +21,7 @@ export const HowItWorksPage = ({ t = (key) => key }) => {
         {[
           { icon: '🔍', title: t('delivery_how_1').split('.')[0] || 'Browse', desc: t('products_subtitle') },
           { icon: '🛒', title: t('delivery_how_2').split('.')[0] || 'Order', desc: t('delivery_how_2') },
-          { icon: '💵', title: t('cod_option'), desc: t('cod_desc') + ' / ' + t('promptpay_desc') },
+          { icon: '📱', title: t('promptpay_option'), desc: t('promptpay_desc') },
           { icon: '🌱', title: t('delivery_how_3').split('\u2014')[0] || 'Receive', desc: t('delivery_how_3') },
         ].map((step, i) => (
           <div key={i} style={{ textAlign: 'center' }}>

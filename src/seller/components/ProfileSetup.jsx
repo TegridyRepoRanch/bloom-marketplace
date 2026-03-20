@@ -4,6 +4,7 @@ import { colors } from '../../shared/theme';
 import { useIsMobile } from '../../shared/hooks/useIsMobile';
 import { useLanguage } from '../hooks/useLanguage';
 import { sanitize } from '../lib/utils';
+import { optimizeImage } from '../../shared/imageUtils';
 import { FARM_SIZES, GROWING_METHODS, CERTIFICATIONS } from '../lib/priceUnits';
 import { Card } from './ui/Card';
 import { Input } from './ui/Input';
@@ -47,33 +48,48 @@ export const ProfileSetupScreen = ({ user, onComplete, existingProfile }) => {
       return;
     }
 
-    // Validate file size
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File too large (max 5MB)');
+    // Validate file size (generous limit — we optimize client-side)
+    if (file.size > 20 * 1024 * 1024) {
+      setError('File too large (max 20MB)');
       return;
     }
 
     setError('');
     setUploadingPhoto(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-    const filePath = `profiles/${fileName}`;
 
-    const { data, uploadError } = await supabase.storage
-      .from('images')
-      .upload(filePath, file);
+    try {
+      // Client-side optimization: resize profile photos to 400x400 max
+      const { file: optimizedFile } = await optimizeImage(file, {
+        maxWidth: 400,
+        maxHeight: 400,
+        quality: 0.85,
+      });
 
-    if (uploadError) {
-      setError(`Upload error: ${uploadError.message}`);
-      setUploadingPhoto(false);
-      return;
+      const fileExt = optimizedFile.name.split('.').pop() || 'webp';
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `profiles/${fileName}`;
+
+      const { error: storageError } = await supabase.storage
+        .from('images')
+        .upload(filePath, optimizedFile, {
+          cacheControl: '31536000',
+          contentType: optimizedFile.type,
+        });
+
+      if (storageError) {
+        setError(`Upload error: ${storageError.message}`);
+        setUploadingPhoto(false);
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      setProfilePhotoUrl(publicUrl + '?t=' + Date.now());
+    } catch (err) {
+      setError(`Upload failed: ${err.message}`);
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('images')
-      .getPublicUrl(filePath);
-
-    setProfilePhotoUrl(publicUrl);
     setUploadingPhoto(false);
   };
 

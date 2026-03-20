@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { colors } from '../../shared/theme';
 import { useIsMobile } from '../../shared/hooks/useIsMobile';
+import { OptimizedImage } from '../../shared/components/OptimizedImage';
 import { getPriceUnitLabel } from '../lib/priceUnits';
 
 // =============================================
@@ -8,8 +8,6 @@ import { getPriceUnitLabel } from '../lib/priceUnits';
 // =============================================
 export const ProductCard = ({ listing, onClick, t = (key) => key }) => {
   const isMobile = useIsMobile();
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgError, setImgError] = useState(false);
 
   return (
   <article
@@ -17,7 +15,7 @@ export const ProductCard = ({ listing, onClick, t = (key) => key }) => {
     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
     tabIndex={0}
     role="button"
-    aria-label={`${listing.title}, ฿${parseFloat(listing.price).toFixed(0)} per unit${listing.quantity_available ? `, ${listing.quantity_available} available` : ''}`}
+    aria-label={`${listing.title}, ฿${parseFloat(listing.price).toFixed(0)} per unit${listing.quantity_available != null ? `, ${listing.quantity_available} available` : ''}`}
     className="animate-fade-in-up product-card"
     style={{
       background: colors.white,
@@ -36,39 +34,22 @@ export const ProductCard = ({ listing, onClick, t = (key) => key }) => {
       e.currentTarget.style.boxShadow = '0 4px 20px rgba(45, 125, 70, 0.1)';
     }}
   >
-    <div style={{
+    <div className="product-card" style={{
       width: '100%',
       aspectRatio: '4 / 3',
       background: colors.gradient1,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       overflow: 'hidden',
       position: 'relative',
     }}>
-      {!imgLoaded && !imgError && listing.images && listing.images[0] && (
-        <div style={{
-          position: 'absolute',
-          width: '100%',
-          height: '100%',
-          background: 'linear-gradient(90deg, rgba(45,125,70,0.1) 25%, rgba(45,125,70,0.05) 50%, rgba(45,125,70,0.1) 75%)',
-          backgroundSize: '200% 100%',
-          animation: 'skeleton-loading 1.5s infinite',
-        }} />
-      )}
-      {listing.images && listing.images[0] && !imgError ? (
-        <img
-          src={listing.images[0]}
-          alt={`Photo of ${listing.title}`}
-          loading="lazy"
-          className="product-card-img"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: imgLoaded ? 1 : 0.5, transition: 'opacity 0.3s ease' }}
-          onLoad={() => setImgLoaded(true)}
-          onError={() => setImgError(true)}
-        />
-      ) : (
-        <span style={{ fontSize: 80 }} aria-hidden="true">🌿</span>
-      )}
+      <OptimizedImage
+        src={listing.images?.[0]}
+        alt={`Photo of ${listing.title}`}
+        fallbackEmoji={listing.category === 'seeds' ? '🫘' : listing.category === 'buds' ? '🌿' : '🌱'}
+        width={isMobile ? 320 : 560}
+        sizes={isMobile ? '50vw' : '33vw'}
+        style={{ width: '100%', height: '100%' }}
+        imgStyle={{ objectFit: 'cover' }}
+      />
     </div>
 
     <div style={{ padding: isMobile ? 12 : 16 }}>

@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '../../shared/supabase';
 import { colors, shadows } from '../../shared/theme';
+import { optimizeImage } from '../../shared/imageUtils';
 import { Spinner } from './ui/Spinner';
 
 export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId }) => {
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [imgErrors, setImgErrors] = useState(new Set());
+  const fileInputRef = useRef(null);
 
   const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -15,8 +18,10 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
     setUploadError('');
     setUploading(true);
     const newImages = [...images];
+    const totalFiles = Math.min(files.length, maxImages - newImages.length);
 
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       if (newImages.length >= maxImages) break;
 
       // Validate it's an image
@@ -26,26 +31,39 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
         return;
       }
 
-      // Validate file size
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError('File too large (max 5MB)');
+      // Validate original file size (generous limit since we'll optimize)
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError('File too large (max 20MB before optimization)');
         setUploading(false);
         return;
       }
 
-      // Upload to Supabase Storage
       try {
-        const fileExt = file.name.split('.').pop();
+        // Client-side optimization: resize to max 1200px and compress
+        setUploadProgress(`Optimizing ${i + 1}/${totalFiles}...`);
+        const { file: optimizedFile } = await optimizeImage(file, {
+          maxWidth: 1200,
+          maxHeight: 1200,
+          quality: 0.82,
+        });
+
+        // Upload optimized file to Supabase Storage
+        setUploadProgress(`Uploading ${i + 1}/${totalFiles}...`);
+        const fileExt = optimizedFile.name.split('.').pop() || 'webp';
         const fileName = `${sellerId || 'unknown'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
         const filePath = `listings/${fileName}`;
 
-        const { data, error: storageError } = await supabase.storage
+        const { error: storageError } = await supabase.storage
           .from('images')
-          .upload(filePath, file);
+          .upload(filePath, optimizedFile, {
+            cacheControl: '31536000', // 1 year cache — images are immutable (unique names)
+            contentType: optimizedFile.type,
+          });
 
         if (storageError) {
           setUploadError(`Upload error: ${storageError.message}`);
           setUploading(false);
+          setUploadProgress('');
           return;
         }
 
@@ -58,23 +76,44 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
       } catch (err) {
         setUploadError(`Upload failed: ${err.message}`);
         setUploading(false);
+        setUploadProgress('');
         return;
       }
     }
 
     onImagesChange(newImages);
     setUploading(false);
+    setUploadProgress('');
+
+    // Reset file input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const removeImage = (index) => {
     const newImages = images.filter((_, i) => i !== index);
+    // Clear error state for removed image and shift indices
+    const newErrors = new Set();
+    imgErrors.forEach(errIdx => {
+      if (errIdx < index) newErrors.add(errIdx);
+      else if (errIdx > index) newErrors.add(errIdx - 1);
+    });
+    setImgErrors(newErrors);
     onImagesChange(newImages);
   };
 
   const handleImageError = (index) => {
-    const newErrors = new Set(imgErrors);
-    newErrors.add(index);
-    setImgErrors(newErrors);
+    setImgErrors(prev => new Set(prev).add(index));
+  };
+
+  // Drag-and-drop reordering (swap first image)
+  const handleMakePrimary = (index) => {
+    if (index === 0) return;
+    const newImages = [...images];
+    const [moved] = newImages.splice(index, 1);
+    newImages.unshift(moved);
+    // Reset error tracking on reorder
+    setImgErrors(new Set());
+    onImagesChange(newImages);
   };
 
   return (
@@ -105,7 +144,7 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 12, marginBottom: 16 }}>
         {images.map((url, index) => (
           <div
-            key={index}
+            key={`${url}-${index}`}
             style={{
               position: 'relative',
               width: '100%',
@@ -114,6 +153,7 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
               overflow: 'hidden',
               background: colors.blush,
               boxShadow: shadows.sm,
+              border: index === 0 ? `2px solid ${colors.primary}` : 'none',
             }}
           >
             {!imgErrors.has(index) ? (
@@ -121,6 +161,7 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
                 src={url}
                 alt={`Product ${index + 1}`}
                 loading="lazy"
+                decoding="async"
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -139,12 +180,58 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 40,
+                flexDirection: 'column',
+                gap: 4,
               }}>
-                🌿
+                <span>🌿</span>
+                <span style={{ fontSize: 10, color: colors.error }}>Failed</span>
               </div>
             )}
+
+            {/* Primary badge */}
+            {index === 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: 4,
+                left: 4,
+                padding: '2px 6px',
+                borderRadius: 6,
+                background: colors.primary,
+                color: colors.white,
+                fontSize: 9,
+                fontWeight: 700,
+              }}>
+                Cover
+              </div>
+            )}
+
+            {/* Make primary button for non-primary images */}
+            {index > 0 && (
+              <button
+                onClick={() => handleMakePrimary(index)}
+                title="Make cover image"
+                style={{
+                  position: 'absolute',
+                  bottom: 4,
+                  left: 4,
+                  padding: '2px 6px',
+                  borderRadius: 6,
+                  background: 'rgba(0,0,0,0.5)',
+                  color: colors.white,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Set Cover
+              </button>
+            )}
+
+            {/* Delete button */}
             <button
               onClick={() => removeImage(index)}
+              aria-label={`Remove image ${index + 1}`}
               style={{
                 position: 'absolute',
                 top: 4,
@@ -164,14 +251,16 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
                 transition: 'all 0.3s ease',
               }}
               onMouseOver={(e) => {
-                e.target.style.background = '#c0392b';
-                e.target.style.transform = 'scale(1.1)';
+                e.currentTarget.style.background = '#c0392b';
+                e.currentTarget.style.transform = 'scale(1.1)';
               }}
               onMouseOut={(e) => {
-                e.target.style.background = colors.error;
-                e.target.style.transform = 'scale(1)';
+                e.currentTarget.style.background = colors.error;
+                e.currentTarget.style.transform = 'scale(1)';
               }}
-            >×</button>
+            >
+              ×
+            </button>
           </div>
         ))}
 
@@ -205,6 +294,7 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
           }}
           >
             <input
+              ref={fileInputRef}
               type="file"
               accept="image/*"
               multiple
@@ -212,17 +302,38 @@ export const ImageUpload = ({ images, onImagesChange, maxImages = 5, sellerId })
               style={{ display: 'none' }}
               disabled={uploading}
             />
-            {uploading ? (
-              <Spinner size={24} />
-            ) : (
-              <div style={{ textAlign: 'center' }}>
-                <span style={{ fontSize: 28, color: colors.primary, display: 'block', marginBottom: 4 }}>+</span>
-                <span style={{ fontSize: 12, color: colors.gray }}>Add Photo</span>
-              </div>
-            )}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              {uploading ? (
+                <div style={{ textAlign: 'center' }}>
+                  <Spinner size={24} />
+                  {uploadProgress && (
+                    <span style={{ display: 'block', fontSize: 10, color: colors.gray, marginTop: 4 }}>
+                      {uploadProgress}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ fontSize: 28, color: colors.primary, display: 'block', marginBottom: 4 }}>+</span>
+                  <span style={{ fontSize: 12, color: colors.gray }}>Add Photo</span>
+                  <span style={{ fontSize: 10, color: colors.lightGray, display: 'block', marginTop: 2 }}>Auto-optimized</span>
+                </div>
+              )}
+            </div>
           </label>
         )}
       </div>
+
+      <p style={{ fontSize: 11, color: colors.lightGray, margin: 0 }}>
+        Images are automatically resized and compressed before upload. First image is the cover photo.
+      </p>
     </div>
   );
 };

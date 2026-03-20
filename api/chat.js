@@ -13,9 +13,9 @@ Product Categories:
 2. Seeds — Cannabis seeds from seed banks (per seed, per pack)
 3. Buds — Craft cannabis flower (per gram, per ounce, per 100g)
 
-How Ordering Works: Browse → add to cart → checkout with delivery address → choose COD or PromptPay → vendor ships in 24-48h → delivery in 1-3 business days.
+How Ordering Works: Browse → add to cart → checkout with delivery address → scan PromptPay QR to pay → upload payment screenshot → vendor ships in 24-48h → delivery in 1-3 business days.
 
-Payment: PromptPay QR (instant via Thai banking app) or Cash on Delivery (COD, available everywhere in Thailand). Currency: THB.
+Payment: PromptPay QR only. Customers scan the QR code at checkout with their Thai banking app, pay the exact amount, then upload a screenshot of the confirmation. Currency: THB. No cash on delivery.
 
 Delivery: 24-48h dispatch, 1-3 days delivery, all 77 provinces. Tracking via LINE.
 

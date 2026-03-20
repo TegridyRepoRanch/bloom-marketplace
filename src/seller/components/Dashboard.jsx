@@ -821,7 +821,7 @@ export const DashboardScreen = ({ user, profile, onLogout, onEditProfile, onCrea
                     <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 20 }}>Revenue by Payment Method</h3>
                     {(() => {
                       const paymentBreakdown = {
-                        cod: { label: 'Cash on Delivery', amount: 0 },
+                        cod: { label: 'PromptPay (Legacy)', amount: 0 },
                         promptpay: { label: 'PromptPay', amount: 0 }
                       };
                       orders.forEach(order => {

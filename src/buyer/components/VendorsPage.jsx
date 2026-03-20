@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { colors } from '../../shared/theme';
 import { useIsMobile } from '../../shared/hooks/useIsMobile';
+import { OptimizedImage } from '../../shared/components/OptimizedImage';
 import { supabase } from '../../shared/supabase';
 
 // =============================================
@@ -76,12 +77,13 @@ export const VendorsPage = ({ t = (key) => key }) => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24 }}>
             {vendors.map(vendor => (
               <div key={vendor.id} style={{ background: colors.white, borderRadius: 24, padding: 32, boxShadow: '0 4px 20px rgba(45, 125, 70, 0.1)', textAlign: 'center' }}>
-                <div style={{ width: 100, height: 100, borderRadius: '50%', background: colors.gradient1, margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  {vendor.profile_photo_url ? (
-                    <img src={vendor.profile_photo_url} alt={vendor.business_name || 'Vendor'} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: 48 }}>🌿</span>
-                  )}
+                <div style={{ width: 100, height: 100, borderRadius: '50%', margin: '0 auto 20px', overflow: 'hidden' }}>
+                  <OptimizedImage
+                    src={vendor.profile_photo_url}
+                    alt={vendor.farm_name || vendor.display_name || 'Vendor'}
+                    width={200}
+                    style={{ width: 100, height: 100, background: colors.gradient1, borderRadius: '50%' }}
+                  />
                 </div>
                 <h3 style={{ fontSize: 22, fontWeight: 700, color: colors.dark }}>{vendor.farm_name || vendor.display_name}</h3>
                 {vendor.location && <p style={{ color: colors.gray, marginTop: 8 }}>📍 {vendor.location}</p>}

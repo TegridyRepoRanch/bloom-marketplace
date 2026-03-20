@@ -1,5 +1,6 @@
 import { colors } from '../../shared/theme';
 import { useIsMobile } from '../../shared/hooks/useIsMobile';
+import { OptimizedImage } from '../../shared/components/OptimizedImage';
 import { getPriceUnitLabel } from '../lib/priceUnits';
 
 // =============================================
@@ -50,15 +51,18 @@ export const CartPage = ({ cart, onUpdateQuantity, onRemove, onCheckout, onConti
                   {/* Image */}
                   <div style={{
                     width: isMobile ? 60 : 80, height: isMobile ? 60 : 80, borderRadius: 12,
-                    background: colors.gradient1,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    overflow: 'hidden', flexShrink: 0, aspectRatio: '1',
+                    overflow: 'hidden', flexShrink: 0,
                   }}>
-                    {item.product.images && item.product.images[0] ? (
-                      <img src={item.product.images[0]} alt={item.product.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: isMobile ? 28 : 36 }}>🌿</span>
-                    )}
+                    <OptimizedImage
+                      src={item.product.images?.[0]}
+                      alt={item.product.title}
+                      width={160}
+                      style={{
+                        width: isMobile ? 60 : 80,
+                        height: isMobile ? 60 : 80,
+                        background: colors.gradient1,
+                      }}
+                    />
                   </div>
 
                   {/* Details - on mobile, spans full width below image */}
@@ -119,7 +123,7 @@ export const CartPage = ({ cart, onUpdateQuantity, onRemove, onCheckout, onConti
               </button>
 
               <p style={{ textAlign: 'center', marginTop: 12, color: colors.gray, fontSize: isMobile ? 12 : 14 }}>
-                💵 {t('cart_cod')}
+                📱 {t('cart_promptpay')}
               </p>
             </div>
           </>

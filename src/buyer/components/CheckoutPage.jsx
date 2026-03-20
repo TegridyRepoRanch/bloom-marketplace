@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { colors } from '../../shared/theme';
 import { useIsMobile } from '../../shared/hooks/useIsMobile';
 import { supabase } from '../../shared/supabase';
-import { PromptPayQR } from './PromptPayQR';
+import { optimizeImage } from '../../shared/imageUtils';
 
 // =============================================
 // CHECKOUT PAGE — Multi-step: Info → QR Payment → Screenshot Upload → Auto-submit
@@ -24,7 +24,7 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
   const [proofPreview, setProofPreview] = useState(null);
   const [proofFile, setProofFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('promptpay'); // 'promptpay' or 'cod'
+  const paymentMethod = 'promptpay';
   const [fieldErrors, setFieldErrors] = useState({});
   const fileInputRef = useRef(null);
 
@@ -154,7 +154,7 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
     }
   };
 
-  // Submit order (supports both PromptPay and COD)
+  // Submit order (PromptPay QR only)
   const handleSubmitOrder = async () => {
     // Prevent double-submit while Supabase calls are in-flight
     if (loading) return;
@@ -174,13 +174,20 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
 
       // Upload payment proof only for PromptPay
       if (paymentMethod === 'promptpay' && proofFile) {
-        const fileExt = proofFile.name.split('.').pop() || 'jpg';
+        // Optimize proof image client-side before upload
+        const { file: optimizedProof } = await optimizeImage(proofFile, {
+          maxWidth: 1200,
+          maxHeight: 1600,
+          quality: 0.85,
+        });
+
+        const fileExt = optimizedProof.name.split('.').pop() || 'jpg';
         const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
         const filePath = `proofs/${fileName}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('payment-proofs')
-          .upload(filePath, proofFile, { cacheControl: '3600', upsert: false });
+          .upload(filePath, optimizedProof, { cacheControl: '3600', upsert: false });
 
         if (uploadError) {
           throw new Error('Failed to upload payment screenshot. Please try again.');
@@ -428,34 +435,7 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
           {/* ========== STEP 2: Payment Method + Submit ========== */}
           {step === 2 && (
             <div>
-              {/* Payment Method Selector */}
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 16 }}>{t('select_payment')}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-                {[
-                  { id: 'promptpay', icon: '📱', label: t('promptpay_option'), desc: t('promptpay_desc') },
-                  { id: 'cod', icon: '💵', label: t('cod_option'), desc: t('cod_desc') },
-                ].map(method => (
-                  <button
-                    key={method.id}
-                    type="button"
-                    onClick={() => { setPaymentMethod(method.id); setError(''); }}
-                    style={{
-                      padding: 16, borderRadius: 16, cursor: 'pointer',
-                      border: paymentMethod === method.id ? `3px solid ${colors.primary}` : `2px solid ${colors.blush}`,
-                      background: paymentMethod === method.id ? '#E8F5E9' : colors.white,
-                      textAlign: 'center', transition: 'all 0.3s',
-                      fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    }}
-                  >
-                    <span style={{ fontSize: 32, display: 'block', marginBottom: 8 }}>{method.icon}</span>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: colors.dark, display: 'block' }}>{method.label}</span>
-                    <span style={{ fontSize: 12, color: colors.gray }}>{method.desc}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* PromptPay QR Section (only shown when PromptPay selected) */}
-              {paymentMethod === 'promptpay' && (
+              {/* PromptPay QR Payment */}
               <div>
               {/* QR Code Display */}
               <div style={{
@@ -470,22 +450,15 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
                   Open your banking app, scan the QR code below, and transfer the exact amount.
                 </p>
 
-                {/* QR Image — uses seller PromptPay IDs from cart */}
+                {/* Static QR Code Image */}
                 <div style={{
                   background: '#fff', borderRadius: 16, padding: 20, display: 'inline-block',
                   boxShadow: '0 4px 20px rgba(26, 77, 176, 0.15)',
                 }}>
-                  {/* Use the first seller's PromptPay ID from cart */}
-                  {cart[0]?.product?.profiles?.promptpay_id ? (
-                    <PromptPayQR
-                      promptpayId={cart[0].product.profiles.promptpay_id}
-                      amount={total}
-                      size={isMobile ? 200 : 250}
-                      t={t}
-                    />
-                  ) : (
-                    <img src="payment-qr.png" alt="PromptPay QR" style={{ maxWidth: isMobile ? 200 : 250 }} />
-                  )}
+                  <img src="/QRCODE.jpg" alt="PromptPay QR Code" style={{
+                    width: isMobile ? 200 : 250, height: isMobile ? 200 : 250,
+                    borderRadius: 12, objectFit: 'contain',
+                  }} />
                 </div>
 
                 <p style={{ fontSize: 24, fontWeight: 800, color: '#1A4DB0', marginTop: 16 }}>
@@ -580,39 +553,6 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
                 {loading ? t('submitting') : proofFile ? `${t('confirm_order')} — ฿${total.toFixed(0)}` : t('upload_to_continue')}
               </button>
               </div>
-              )}
-
-              {/* COD Section */}
-              {paymentMethod === 'cod' && (
-                <div>
-                  <div style={{
-                    background: '#FFF8E1', borderRadius: 16, padding: 24, marginBottom: 24,
-                    border: '2px solid #FFD54F', textAlign: 'center',
-                  }}>
-                    <span style={{ fontSize: 48, display: 'block', marginBottom: 12 }}>💵</span>
-                    <h4 style={{ fontSize: 18, fontWeight: 700, color: colors.dark, marginBottom: 8 }}>{t('cod_option')}</h4>
-                    <p style={{ color: colors.gray, fontSize: 14 }}>{t('cod_desc')}</p>
-                    <p style={{ color: colors.primary, fontWeight: 700, fontSize: 24, marginTop: 16 }}>฿{total.toFixed(0)}</p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={handleSubmitOrder}
-                    style={{
-                      width: '100%', padding: isMobile ? '16px 24px' : '20px 40px', borderRadius: 30, minHeight: 44,
-                      border: 'none',
-                      background: loading ? colors.gray : colors.gradient1,
-                      color: colors.white, fontWeight: 700, fontSize: isMobile ? 16 : 18,
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                      boxShadow: !loading ? '0 8px 30px rgba(45, 125, 70, 0.4)' : 'none',
-                      fontFamily: 'Plus Jakarta Sans, sans-serif',
-                      transition: 'all 0.3s',
-                    }}
-                  >
-                    {loading ? t('submitting') : `${t('checkout_place')} — ฿${total.toFixed(0)}`}
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>

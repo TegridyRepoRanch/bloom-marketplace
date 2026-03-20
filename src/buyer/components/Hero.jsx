@@ -189,7 +189,6 @@ export const HeroSection = ({ onNavigate, t = (key) => key }) => {
           }}>
             {[
               { icon: '✓', label: t('trust_verified') },
-              { icon: '💵', label: t('trust_cod') },
               { icon: '📱', label: t('trust_promptpay') },
               { icon: '⚡', label: t('trust_dispatch') },
               { icon: '💬', label: t('trust_line') },

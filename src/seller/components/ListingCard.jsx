@@ -1,5 +1,6 @@
 import { colors } from '../../shared/theme';
 import { useLanguage } from '../hooks/useLanguage';
+import { OptimizedImage } from '../../shared/components/OptimizedImage';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 
@@ -13,23 +14,16 @@ export const ListingCard = ({ listing, onEdit, onToggleAvailability, onDelete })
           width: 100,
           height: 100,
           borderRadius: 12,
-          background: colors.gradient1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           overflow: 'hidden',
           flexShrink: 0,
         }}>
-          {listing.images && listing.images[0] ? (
-            <img
-              src={listing.images[0]}
-              alt={listing.title}
-              loading="lazy"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          ) : (
-            <span style={{ fontSize: 40 }}>🌿</span>
-          )}
+          <OptimizedImage
+            src={listing.images?.[0]}
+            alt={listing.title}
+            fallbackEmoji="🌿"
+            width={200}
+            style={{ width: 100, height: 100, background: colors.gradient1 }}
+          />
         </div>
 
         {/* Details */}
@@ -52,6 +46,8 @@ export const ListingCard = ({ listing, onEdit, onToggleAvailability, onDelete })
               fontWeight: 600,
               background: listing.is_available ? colors.mint : colors.lightGray,
               color: listing.is_available ? colors.dark : colors.white,
+              flexShrink: 0,
+              marginLeft: 8,
             }}>
               {listing.is_available ? t('status_active') : t('status_hidden')}
             </span>
@@ -65,9 +61,15 @@ export const ListingCard = ({ listing, onEdit, onToggleAvailability, onDelete })
             ฿{parseFloat(listing.price).toFixed(0)}
             <span style={{ fontSize: 14, fontWeight: 400, color: colors.gray }}> {t('per_unit')}</span>
           </p>
-          {listing.quantity_available && (
-            <p style={{ fontSize: 13, color: colors.gray, marginTop: 4 }}>
-              {listing.quantity_available} available
+          {/* BUG FIX: Use != null to correctly show quantity when it's 0 */}
+          {listing.quantity_available != null && (
+            <p style={{
+              fontSize: 13,
+              color: listing.quantity_available <= 0 ? colors.error : colors.gray,
+              marginTop: 4,
+              fontWeight: listing.quantity_available <= 0 ? 600 : 400,
+            }}>
+              {listing.quantity_available <= 0 ? 'Sold out' : `${listing.quantity_available} available`}
             </p>
           )}
         </div>
@@ -106,4 +108,3 @@ export const ListingCard = ({ listing, onEdit, onToggleAvailability, onDelete })
     </Card>
   );
 };
-
