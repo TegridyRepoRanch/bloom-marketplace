@@ -196,27 +196,11 @@ export async function generateBlurPlaceholder(source) {
 export function getTransformedUrl(url, options = {}) {
   if (!url || typeof url !== 'string') return url;
 
-  // Only transform Supabase storage URLs
-  if (!url.includes('supabase.co/storage/v1/object/public/')) return url;
-
-  const { width, height, resize = 'cover', quality = 75 } = options;
-
-  // Convert public URL to render URL for transforms
-  // e.g., .../storage/v1/object/public/images/... → .../storage/v1/render/image/public/images/...
-  const transformedUrl = url.replace(
-    '/storage/v1/object/public/',
-    '/storage/v1/render/image/public/'
-  );
-
-  const params = new URLSearchParams();
-  if (width) params.set('width', String(width));
-  if (height) params.set('height', String(height));
-  params.set('resize', resize);
-  params.set('quality', String(quality));
-
-  // Strip any existing query params (like cache-busting ?t=)
-  const baseUrl = transformedUrl.split('?')[0];
-  return `${baseUrl}?${params.toString()}`;
+  // Supabase Image Transformations require a paid add-on.
+  // The /render/image/ endpoint returns 403 when transforms aren't enabled,
+  // which causes every product image to fail and show the Retry fallback.
+  // Return the original URL as-is until transforms are enabled on the project.
+  return url;
 }
 
 /**
@@ -228,11 +212,8 @@ export function getTransformedUrl(url, options = {}) {
  * @returns {string} - srcSet attribute value
  */
 export function buildSrcSet(url, widths = [320, 640, 960, 1200]) {
-  if (!url || !url.includes('supabase.co/storage/v1/object/public/')) {
-    return ''; // Can't transform non-Supabase URLs
-  }
-
-  return widths
-    .map(w => `${getTransformedUrl(url, { width: w, quality: 75 })} ${w}w`)
-    .join(', ');
+  // Disabled: Supabase Image Transformations not enabled on this project (403).
+  // Without transforms, srcSet would just repeat the same original URL at every width,
+  // which provides no benefit. Return empty to let the browser use the src directly.
+  return '';
 }
