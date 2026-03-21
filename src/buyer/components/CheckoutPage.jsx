@@ -161,6 +161,16 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
     return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(selectedCrypto.address)}&bgcolor=ffffff&color=000000&margin=10`;
   }, [paymentMethod]);
 
+  // QR code loading/error states
+  const [qrLoaded, setQrLoaded] = useState(false);
+  const [qrError, setQrError] = useState(false);
+
+  // Reset QR states when payment method changes
+  useEffect(() => {
+    setQrLoaded(false);
+    setQrError(false);
+  }, [paymentMethod]);
+
   // Track copy state for UX feedback
   const [copied, setCopied] = useState(false);
   const handleCopyAddress = useCallback(() => {
@@ -793,11 +803,40 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
                     <div style={{
                       background: '#fff', borderRadius: 16, padding: 20, display: 'inline-block',
                       boxShadow: `0 4px 20px ${selectedCrypto.color}20`, marginBottom: 20,
+                      minWidth: isMobile ? 200 : 250, minHeight: isMobile ? 200 : 250,
+                      position: 'relative',
                     }}>
-                      <img src={cryptoQrUrl} alt={`${selectedCrypto.symbol} wallet QR code`} style={{
-                        width: isMobile ? 200 : 250, height: isMobile ? 200 : 250,
-                        borderRadius: 12, objectFit: 'contain',
-                      }} />
+                      {!qrLoaded && !qrError && (
+                        <div style={{
+                          width: isMobile ? 200 : 250, height: isMobile ? 200 : 250,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: colors.gray, fontSize: 14,
+                        }}>
+                          Loading QR...
+                        </div>
+                      )}
+                      {qrError && (
+                        <div style={{
+                          width: isMobile ? 200 : 250, height: isMobile ? 200 : 250,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
+                          color: colors.gray, fontSize: 13, textAlign: 'center', padding: 16,
+                        }}>
+                          <span style={{ fontSize: 32, marginBottom: 8 }}>📷</span>
+                          <span>{lang === 'th' ? 'ไม่สามารถโหลด QR ได้' : 'QR code unavailable'}</span>
+                          <span style={{ fontSize: 11, marginTop: 4 }}>{lang === 'th' ? 'กรุณาคัดลอกที่อยู่ด้านล่าง' : 'Please copy the address below'}</span>
+                        </div>
+                      )}
+                      <img
+                        src={cryptoQrUrl}
+                        alt={`${selectedCrypto.symbol} wallet QR code`}
+                        onLoad={() => setQrLoaded(true)}
+                        onError={() => setQrError(true)}
+                        style={{
+                          width: isMobile ? 200 : 250, height: isMobile ? 200 : 250,
+                          borderRadius: 12, objectFit: 'contain',
+                          display: qrLoaded && !qrError ? 'block' : 'none',
+                        }}
+                      />
                     </div>
                   )}
 
