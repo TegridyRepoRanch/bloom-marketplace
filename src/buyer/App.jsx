@@ -7,17 +7,36 @@ import { HeroSection } from './components/Hero';
 import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
 
+// Retry wrapper for lazy imports — handles stale chunk errors after deploys.
+// If a chunk fails to load (e.g. filename changed after deploy), retries once
+// then reloads the page to get fresh HTML with correct chunk references.
+const lazyLoad = (importFn, exportName) =>
+  lazy(() =>
+    importFn()
+      .then(m => ({ default: m[exportName] }))
+      .catch(() => {
+        const reloaded = sessionStorage.getItem('chunk_retry');
+        if (!reloaded) {
+          sessionStorage.setItem('chunk_retry', '1');
+          window.location.reload();
+          return { default: () => null };
+        }
+        sessionStorage.removeItem('chunk_retry');
+        return importFn().then(m => ({ default: m[exportName] }));
+      })
+  );
+
 // Lazy-load route components for faster initial page load
-const ProductsPage = lazy(() => import('./components/ProductsPage').then(m => ({ default: m.ProductsPage })));
-const ProductDetailPage = lazy(() => import('./components/ProductDetail').then(m => ({ default: m.ProductDetailPage })));
-const CartPage = lazy(() => import('./components/CartPage').then(m => ({ default: m.CartPage })));
-const CheckoutPage = lazy(() => import('./components/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
-const OrderConfirmationPage = lazy(() => import('./components/OrderConfirmation').then(m => ({ default: m.OrderConfirmationPage })));
-const VendorsPage = lazy(() => import('./components/VendorsPage').then(m => ({ default: m.VendorsPage })));
-const HowItWorksPage = lazy(() => import('./components/HowItWorks').then(m => ({ default: m.HowItWorksPage })));
-const AboutPage = lazy(() => import('./components/AboutPage').then(m => ({ default: m.AboutPage })));
-const ContactPage = lazy(() => import('./components/ContactPage').then(m => ({ default: m.ContactPage })));
-const NotFoundPage = lazy(() => import('./components/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+const ProductsPage = lazyLoad(() => import('./components/ProductsPage'), 'ProductsPage');
+const ProductDetailPage = lazyLoad(() => import('./components/ProductDetail'), 'ProductDetailPage');
+const CartPage = lazyLoad(() => import('./components/CartPage'), 'CartPage');
+const CheckoutPage = lazyLoad(() => import('./components/CheckoutPage'), 'CheckoutPage');
+const OrderConfirmationPage = lazyLoad(() => import('./components/OrderConfirmation'), 'OrderConfirmationPage');
+const VendorsPage = lazyLoad(() => import('./components/VendorsPage'), 'VendorsPage');
+const HowItWorksPage = lazyLoad(() => import('./components/HowItWorks'), 'HowItWorksPage');
+const AboutPage = lazyLoad(() => import('./components/AboutPage'), 'AboutPage');
+const ContactPage = lazyLoad(() => import('./components/ContactPage'), 'ContactPage');
+const NotFoundPage = lazyLoad(() => import('./components/NotFoundPage'), 'NotFoundPage');
 
 const PageLoader = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>

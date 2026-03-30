@@ -6,9 +6,9 @@ import { getPriceUnitLabel } from '../lib/priceUnits';
 // =============================================
 // CART PAGE
 // =============================================
-export const CartPage = ({ cart, onUpdateQuantity, onRemove, onCheckout, onContinueShopping, t = (key) => key }) => {
+export const CartPage = ({ cart = [], onUpdateQuantity, onRemove, onCheckout, onContinueShopping, t = (key) => key }) => {
   const isMobile = useIsMobile();
-  const total = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const total = cart.reduce((sum, item) => sum + ((item.product?.price || 0) * item.quantity), 0);
 
   return (
     <section style={{ minHeight: '100vh', padding: isMobile ? '80px 16px 40px' : '120px 24px 80px', background: colors.cream }}>

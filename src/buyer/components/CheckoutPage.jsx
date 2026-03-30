@@ -119,7 +119,7 @@ const AutocompleteInput = ({ value, onChange, suggestions, placeholder, inputSty
 // =============================================
 // CHECKOUT PAGE — Multi-step: Info → QR Payment → Screenshot Upload → Auto-submit
 // =============================================
-export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lang = 'en' }) => {
+export const CheckoutPage = ({ cart = [], onPlaceOrder, onBack, t = (key) => key, lang = 'en' }) => {
   const isMobile = useIsMobile();
   // Step: 1 = delivery info, 2 = QR payment + screenshot upload
   const [step, setStep] = useState(1);
@@ -187,7 +187,7 @@ export const CheckoutPage = ({ cart, onPlaceOrder, onBack, t = (key) => key, lan
   }, [selectedCrypto]);
   const fileInputRef = useRef(null);
 
-  const total = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const total = cart.reduce((sum, item) => sum + ((item.product?.price || 0) * item.quantity), 0);
 
   // Real-time field validation
   const validateField = (field, value) => {

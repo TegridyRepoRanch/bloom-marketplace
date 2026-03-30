@@ -6,7 +6,15 @@ import { ShareButtons } from './ShareButtons';
 // =============================================
 // ORDER CONFIRMATION
 // =============================================
-export const OrderConfirmationPage = ({ order, onContinueShopping, t = (key) => key }) => { const isMobile = useIsMobile(); return (
+export const OrderConfirmationPage = ({ order, onContinueShopping, t = (key) => key }) => { const isMobile = useIsMobile(); if (!order) return (
+  <section style={{ minHeight: '100vh', padding: '120px 24px 80px', background: colors.cream, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ textAlign: 'center' }}>
+      <p style={{ fontSize: 64, marginBottom: 16 }}>📭</p>
+      <h2 style={{ fontSize: 24, fontWeight: 700, color: colors.dark, marginBottom: 16 }}>{t('no_order')}</h2>
+      <button onClick={onContinueShopping} style={{ padding: '14px 32px', background: colors.primary, color: colors.white, border: 'none', borderRadius: 25, fontWeight: 600, fontSize: 16, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{t('continue_shopping')}</button>
+    </div>
+  </section>
+); return (
   <section style={{ minHeight: '100vh', padding: '120px 24px 80px', background: colors.cream }}>
     <Confetti active={true} />
     <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
