@@ -1,21 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '../shared/supabase';
 import { useLanguage } from './hooks/useLanguage';
 import { trackEvent } from './lib/analytics';
 import { Navigation } from './components/Navbar';
 import { HeroSection } from './components/Hero';
-import { ProductsPage } from './components/ProductsPage';
-import { ProductDetailPage } from './components/ProductDetail';
-import { CartPage } from './components/CartPage';
-import { CheckoutPage } from './components/CheckoutPage';
-import { OrderConfirmationPage } from './components/OrderConfirmation';
-import { VendorsPage } from './components/VendorsPage';
-import { HowItWorksPage } from './components/HowItWorks';
-import { AboutPage } from './components/AboutPage';
-import { ContactPage } from './components/ContactPage';
-import { NotFoundPage } from './components/NotFoundPage';
 import { Footer } from './components/Footer';
 import { Toast } from './components/Toast';
+
+// Lazy-load route components for faster initial page load
+const ProductsPage = lazy(() => import('./components/ProductsPage').then(m => ({ default: m.ProductsPage })));
+const ProductDetailPage = lazy(() => import('./components/ProductDetail').then(m => ({ default: m.ProductDetailPage })));
+const CartPage = lazy(() => import('./components/CartPage').then(m => ({ default: m.CartPage })));
+const CheckoutPage = lazy(() => import('./components/CheckoutPage').then(m => ({ default: m.CheckoutPage })));
+const OrderConfirmationPage = lazy(() => import('./components/OrderConfirmation').then(m => ({ default: m.OrderConfirmationPage })));
+const VendorsPage = lazy(() => import('./components/VendorsPage').then(m => ({ default: m.VendorsPage })));
+const HowItWorksPage = lazy(() => import('./components/HowItWorks').then(m => ({ default: m.HowItWorksPage })));
+const AboutPage = lazy(() => import('./components/AboutPage').then(m => ({ default: m.AboutPage })));
+const ContactPage = lazy(() => import('./components/ContactPage').then(m => ({ default: m.ContactPage })));
+const NotFoundPage = lazy(() => import('./components/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+
+const PageLoader = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+    <div style={{ width: 32, height: 32, border: '3px solid #E8F5E9', borderTopColor: '#2D7D46', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+  </div>
+);
 
 // =============================================
 // MAIN APP
@@ -166,7 +174,9 @@ const App = () => {
     <div>
       <Navigation currentPage={currentPage} onNavigate={navigateTo} cartCount={cartCount} t={t} toggleLang={toggleLang} lang={lang} />
       <main id="main-content" key={currentPage} className="page-transition" role="main" style={{ animation: 'pageIn 0.3s ease-out' }}>
-        {renderPage()}
+        <Suspense fallback={<PageLoader />}>
+          {renderPage()}
+        </Suspense>
       </main>
       <Footer onNavigate={navigateTo} />
       <Toast message={toastMessage || t('add_to_cart') + '!'} visible={showToast} />

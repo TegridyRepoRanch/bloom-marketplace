@@ -1,6 +1,6 @@
 // SiamClones Service Worker — Network-only for HTML, cache for static assets
 // Version bump: increment this on each deploy for cache busting
-const CACHE_VERSION = 8;
+const CACHE_VERSION = 9;
 const CACHE_NAME = `siamclones-v${CACHE_VERSION}`;
 
 // Only cache non-HTML assets — HTML is always fetched from network

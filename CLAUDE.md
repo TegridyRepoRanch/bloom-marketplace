@@ -5,8 +5,7 @@
 A peer-to-peer marketplace for cannabis clones, seeds, and buds targeting
 the Thai market. Connects verified growers with buyers across all 77
 provinces of Thailand. Two portals: a buyer marketplace and a seller
-dashboard. AI chatbot powered by Gemini. Payments via PromptPay QR only
-(no cash on delivery).
+dashboard. Payments via PromptPay QR only (no cash on delivery).
 
 Built by Austin. Lives at siamclones.com.
 
@@ -33,11 +32,10 @@ providers. Cart persists to localStorage. Language persists to localStorage.
 - **Routing**: Hash-based (`#home`, `#products`, `#growers`, `#cart`, `#checkout`, etc.)
 - **Backend / DB**: Supabase (PostgreSQL, Auth, Storage, Edge Functions, Row Level Security)
 - **Hosting**: Vercel — auto-deploy from GitHub main branch, auto-detects Vite
-- **Serverless API**: Vercel Functions (`api/chat.js`) — CommonJS `module.exports` pattern
-- **AI Chatbot**: Gemini 2.5 Flash via Google Generative AI REST API
 - **i18n**: Bilingual EN/TH with `useLanguage` hook and `t()` function, localStorage persistence (default: Thai)
 - **Payments**: PromptPay QR code generation (EMVCo-compliant, built from scratch in `src/shared/qrcode.js`)
-- **PWA**: Service worker v8 (`public/sw.js`), `manifest.json`, offline fallback
+- **Code Splitting**: React.lazy + Suspense for buyer route components, vendor chunk splitting via Vite
+- **PWA**: Service worker v9 (`public/sw.js`), `manifest.json`, offline fallback
 - **Security**: CSP headers (no unsafe-eval needed), X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy via `vercel.json`
 - **Image Optimization**: Client-side resize/compress before upload (`src/shared/imageUtils.js`), lazy loading with IntersectionObserver (`OptimizedImage` component)
 - **Font**: Plus Jakarta Sans (Google Fonts, preloaded)
@@ -90,7 +88,10 @@ bloom-marketplace/
 │   │   │   ├── AuthScreen.jsx      Sign in/up, password strength indicator
 │   │   │   ├── ProfileSetup.jsx    3-step wizard (basics → operation → contact), avatar upload
 │   │   │   ├── CreateListing.jsx   Category-aware form, image upload, validation
-│   │   │   ├── Dashboard.jsx       3 tabs (Listings/Orders/Analytics), stats, CSV export (~1050 lines)
+│   │   │   ├── Dashboard.jsx       Tab shell + state management (~460 lines)
+│   │   │   ├── DashboardOrders.jsx   Orders tab content (search, filter, status updates)
+│   │   │   ├── DashboardAnalytics.jsx Analytics tab content (revenue, trends, charts)
+│   │   │   ├── DashboardListings.jsx  Listings tab content (list, export CSV)
 │   │   │   ├── ImageUpload.jsx     Multi-image upload, client-side optimization, drag reorder
 │   │   │   ├── ListingCard.jsx     Listing row: thumbnail, price, actions (edit/hide/delete)
 │   │   │   ├── ErrorBoundary.jsx   Class component error boundary
@@ -120,16 +121,13 @@ bloom-marketplace/
 │           ├── OptimizedImage.jsx   Lazy load + skeleton + fade-in + retry + error fallback
 │           └── Confetti.jsx         50-piece celebration animation
 ├── public/
-│   ├── chatbot.js          Floating chat widget (IIFE, zero deps, NOT processed by Vite)
-│   ├── sw.js               Service worker v8: network-only HTML, SWR assets, force-reload on activate
+│   ├── sw.js               Service worker v9: network-only HTML, SWR assets, force-reload on activate
 │   ├── QRCODE.jpg          Static PromptPay QR image
 │   ├── payment-qr.png      Static PromptPay QR (alternate)
 │   ├── icon-512.png        PWA icon
 │   ├── robots.txt          Allow all, points to sitemap
 │   └── sitemap.xml         Declares / and /seller.html
-├── api/
-│   └── chat.js             Vercel serverless: Gemini 2.5 Flash, rate limit 20/min/IP, CORS allowlist
-├── vercel.json             Security headers + maxDuration 30s for chat function
+├── vercel.json             Security headers (CSP, X-Frame-Options, etc.)
 ├── manifest.json           PWA manifest (standalone, portrait, green theme)
 ├── supabase-setup.sql      Schema additions: notification fields, rate limiting triggers, webhook
 ├── supabase/
@@ -156,7 +154,6 @@ npm run preview      # Preview production build locally
 |---|---|
 | Buyer Marketplace | https://siamclones.com |
 | Seller Portal | https://siamclones.com/seller.html |
-| Chatbot API Health | https://siamclones.com/api/chat (GET) |
 | Vercel Dashboard | vercel.com/austins-projects-7e45e08e/bloom-marketplace |
 | GitHub Repo | github.com/TegridyRepoRanch/bloom-marketplace |
 | Supabase Project | bqglrepbhjxmbgggdqal.supabase.co |
@@ -165,7 +162,7 @@ npm run preview      # Preview production build locally
 
 | Variable | Where | What |
 |---|---|---|
-| `GEMINI_API_KEY` | Vercel Environment Variables | Google Generative AI key for chatbot. Already set. Do NOT change unless rotating. Model `gemini-2.5-flash`. |
+| `GEMINI_API_KEY` | Vercel Environment Variables | Legacy — was used by chatbot (now removed). Can be deleted from Vercel env vars. |
 | `RESEND_API_KEY` | Supabase Edge Function Secrets | For order notification emails (free tier: 100/day). May not be deployed yet. |
 | `FROM_EMAIL` | Supabase Edge Function Secrets | Verified sender email for Resend. |
 | `DISCORD_WEBHOOK_URL` | Supabase Edge Function Secrets | Optional. For ops channel order alerts. |
@@ -274,21 +271,6 @@ full card width without white gaps.
 `src/shared/qrcode.js` is an ~80K token QR code generator. It works. Do
 not modify or reformat it.
 
-## Chatbot Architecture
-
-Two pieces:
-1. `public/chatbot.js` — Self-contained IIFE widget. Zero dependencies.
-   NOT processed by Vite (lives in `public/`). Handles UI, message history,
-   suggested questions, mobile fullscreen below 640px. Reads language from
-   localStorage (`siamclones_lang`). Has its own markdown-lite renderer
-   with XSS-safe link handling (protocol allowlist). Injected via `<script>`
-   tag on both HTML pages.
-
-2. `api/chat.js` — Vercel serverless function. Receives `{messages: [...], lang}`,
-   forwards to Gemini 2.5 Flash with inlined system prompt, returns `{text: "..."}`.
-   Rate limited to 20 req/min per IP. Safety block responses return friendly
-   fallback messages. Request body capped at 50KB, messages capped at last 20.
-
 ## Notification System (Edge Function)
 
 `supabase/functions/notify-order/index.ts` — Deno-based Edge Function.
@@ -310,7 +292,7 @@ Sends notifications via three channels:
 - XSS prevention (React rendering, `sanitize()` utility, no innerHTML except chatbot markdown)
 - Supabase RLS on all tables
 - CORS restricted to production domains on chatbot API
-- Rate limiting: chatbot API (20/min/IP), orders (10/hr/phone), listings (20 total, 5/hr)
+- Rate limiting: orders (10/hr/phone), listings (20 total, 5/hr)
 - Input sanitization on all forms (checkout, contact, profile)
 - CSP headers (no unsafe-eval) + full security header suite via `vercel.json`
 - Atomic order placement via `place_order_atomic` RPC (prevents overselling)
@@ -320,7 +302,6 @@ Sends notifications via three channels:
 ### Features
 - Full bilingual EN/TH (200+ buyer keys, 150+ seller keys)
 - 404 page for invalid hash routes (bilingual)
-- Chatbot with safety-block handling and friendly fallback messages
 - PromptPay QR code generation (EMVCo-compliant with CRC-16)
 - Product images: 4:3 aspect ratio, lazy loading, skeleton shimmer, retry on error
 - Client-side image optimization (resize + compress before upload)
@@ -356,18 +337,13 @@ Sends notifications via three channels:
 - **Analytics**: localStorage-only event tracking. No GA4, Plausible, or equivalent connected. `dataLayer.push()` calls exist but no GTM script loaded.
 - **Sitemap dates**: `lastmod` is static (2026-03-15), not auto-generated on deploy.
 - **Seller useLanguage duplication**: Buyer and seller each have their own copy of `useLanguage.js` — identical pattern, different translation files. Could be shared but works fine as-is.
-- **Dashboard size**: `Dashboard.jsx` is ~1050 lines. Works but could be split into sub-tab components.
+- **Dashboard**: Split into `Dashboard.jsx` (~460 lines) + `DashboardOrders.jsx`, `DashboardAnalytics.jsx`, `DashboardListings.jsx`.
 - **No automated tests**: No unit tests, integration tests, or E2E tests.
 - **No error reporting**: Errors are caught by ErrorBoundary but not reported to any service (Sentry, etc).
 
 ## Dangerous Patterns to Avoid
 
-- **NEVER** add `type: module` to vercel.json or convert `api/chat.js` to ESM — Vercel serverless functions use CommonJS
-- **NEVER** use `require()` in `api/chat.js` to import local files — Vercel bundling won't resolve them
 - **NEVER** add a `runtime` field to vercel.json — this caused a Vercel build failure previously
-- **NEVER** set `Access-Control-Allow-Origin: *` on the chatbot API — use the allowlist in `api/chat.js`
-- **NEVER** process `chatbot.js` through Vite — it's a standalone IIFE in `public/`, not a module
-- **NEVER** move the `api/` directory — Vercel requires it at the project root
 - **NEVER** edit `src/shared/qrcode.js` — it's a large vendored QR library, not our code
 - **NEVER** use className-based CSS — all component styling is inline React style objects
 - **NEVER** add CSS files or CSS framework imports — keep the existing inline style pattern
@@ -376,14 +352,13 @@ Sends notifications via three channels:
 ## Deployment
 
 GitHub repo: `TegridyRepoRanch/bloom-marketplace` (main branch)
-Vercel auto-deploys on push. Runs `npm run build` (Vite), deploys `dist/` + `api/` + `public/`.
+Vercel auto-deploys on push. Runs `npm run build` (Vite), deploys `dist/` + `public/`.
 
 After pushing:
 1. Check Vercel dashboard for "Ready" status
 2. Hard refresh the site once to pick up new SW
 3. Test buyer flow: home → products → add to cart → checkout
 4. Test seller portal: login → dashboard → listings → orders
-5. Test chatbot: open bubble → ask question → verify response
 
 ## Testing Checklist (Quick)
 
@@ -394,8 +369,6 @@ After pushing:
 - [ ] Add to cart → cart page → checkout form validates
 - [ ] Language toggle EN↔TH works everywhere
 - [ ] 404 page shows for `#nonexistent`
-- [ ] Chatbot responds in English and Thai
-- [ ] `GET /api/chat` returns `{status: "ok", configured: true}`
 - [ ] Seller portal: sign up → profile setup → create listing → dashboard
 - [ ] Seller dashboard: listings, orders, analytics tabs all load
 - [ ] Image upload optimizes and displays correctly

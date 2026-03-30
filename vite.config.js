@@ -9,6 +9,12 @@ export default defineConfig({
         main: 'index.html',
         seller: 'seller.html',
       },
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+        },
+      },
     },
   },
 });
