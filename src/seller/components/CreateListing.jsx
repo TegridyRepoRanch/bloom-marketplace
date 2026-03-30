@@ -28,6 +28,7 @@ export const CreateListingScreen = ({ profile, onBack, onSuccess, editingListing
   const [growingMethod, setGrowingMethod] = useState(editingListing?.growing_method || '');
 
   const handleSubmit = async () => {
+    if (loading) return;
     setError('');
 
     if (!category.trim()) {
@@ -50,7 +51,7 @@ export const CreateListingScreen = ({ profile, onBack, onSuccess, editingListing
       setError('Description must be 2000 characters or less');
       return;
     }
-    if (!price || parseFloat(price) < 0.01) {
+    if (!price || isNaN(parseFloat(price)) || parseFloat(price) < 0.01) {
       setError('Please enter a valid price greater than 0');
       return;
     }
@@ -69,10 +70,6 @@ export const CreateListingScreen = ({ profile, onBack, onSuccess, editingListing
     if (images.length === 0) {
       setError('Please add at least 1 product image');
       return;
-    }
-
-    if (loading) {
-      return; // Prevent double submission
     }
 
     setLoading(true);

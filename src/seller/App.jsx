@@ -22,11 +22,16 @@ export const App = () => {
   // Check for existing session
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await loadProfile(session.user.id);
-      } else {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          await loadProfile(session.user.id);
+        } else {
+          setScreen('auth');
+          window.history.replaceState({ screen: 'auth' }, '', '#auth');
+        }
+      } catch {
         setScreen('auth');
         window.history.replaceState({ screen: 'auth' }, '', '#auth');
       }

@@ -4,7 +4,7 @@ import { colors, shadows } from '../../../shared/theme';
 export const Alert = ({ message, type = 'info', onClose }) => {
   const bgColors = {
     success: colors.mint,
-    error: colors.primary,
+    error: colors.error,
     info: colors.lavender,
   };
 

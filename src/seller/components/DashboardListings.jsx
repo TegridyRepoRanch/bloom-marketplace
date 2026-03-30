@@ -25,9 +25,9 @@ export const DashboardListings = ({
               const columns = [
                 { label: 'Title', accessor: (l) => l.title },
                 { label: 'Category', accessor: (l) => l.category },
-                { label: 'Price', accessor: (l) => `฿${parseFloat(l.price).toFixed(2)}` },
+                { label: 'Price', accessor: (l) => `฿${parseFloat(l.price || 0).toFixed(2)}` },
                 { label: 'Price Unit', accessor: (l) => l.price_unit },
-                { label: 'Quantity', accessor: (l) => l.quantity },
+                { label: 'Quantity', accessor: (l) => l.quantity_available },
                 { label: 'Status', accessor: (l) => l.is_available ? 'Active' : 'Hidden' },
                 { label: 'Created Date', accessor: (l) => new Date(l.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) }
               ];

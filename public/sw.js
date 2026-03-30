@@ -1,6 +1,6 @@
 // SiamClones Service Worker — Network-only for HTML, cache for static assets
 // Version bump: increment this on each deploy for cache busting
-const CACHE_VERSION = 9;
+const CACHE_VERSION = 10;
 const CACHE_NAME = `siamclones-v${CACHE_VERSION}`;
 
 // Only cache non-HTML assets — HTML is always fetched from network
@@ -22,7 +22,8 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate — clean old caches + force-reload all open pages
+// Activate — clean old caches, claim clients.
+// Page reload is handled by the controllerchange listener in the HTML shells.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -48,14 +49,6 @@ self.addEventListener('activate', (event) => {
       });
     }).then(() => {
       return self.clients.claim();
-    }).then(() => {
-      // Force-reload all open pages so they get fresh HTML from the network.
-      // This works even if the old page has no controllerchange listener.
-      return self.clients.matchAll({ type: 'window' }).then((clients) => {
-        clients.forEach((client) => {
-          client.navigate(client.url);
-        });
-      });
     })
   );
 });
@@ -82,15 +75,14 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(() => caches.match(request).then((r) => r || new Response('{"error":"offline"}', { status: 503, headers: { 'Content-Type': 'application/json' } })))
     );
     return;
   }
 
-  // Network-only for external resources (fonts, any remaining CDN)
-  // All JS libs are now self-hosted, but fonts still come from Google
+  // Graceful fallback for external resources (Google Fonts, etc.)
   if (url.hostname !== self.location.hostname && !url.hostname.includes('supabase')) {
-    event.respondWith(fetch(request));
+    event.respondWith(fetch(request).catch(() => new Response('', { status: 408 })));
     return;
   }
 
