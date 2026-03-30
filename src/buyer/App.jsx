@@ -178,7 +178,7 @@ const App = () => {
       case 'home': return <HeroSection onNavigate={navigateTo} t={t} />;
       case 'products': return <ProductsPage onSelectProduct={handleSelectProduct} t={t} />;
       case 'product-detail': return <ProductDetailPage product={selectedProduct} onBack={() => navigateTo('products')} onAddToCart={handleAddToCart} t={t} />;
-      case 'cart': return <CartPage cart={cart} onUpdateQuantity={handleUpdateQuantity} onRemove={handleRemoveFromCart} onCheckout={() => { navigateTo('checkout'); trackEvent('begin_checkout', { cart_value: cart.reduce((s,i) => s + i.product.price * i.quantity, 0), items_count: cart.length }); }} onContinueShopping={() => navigateTo('products')} t={t} />;
+      case 'cart': return <CartPage cart={cart} onUpdateQuantity={handleUpdateQuantity} onRemove={handleRemoveFromCart} onCheckout={() => { navigateTo('checkout'); trackEvent('begin_checkout', { cart_value: cart.reduce((s,i) => s + (i.product?.price || 0) * i.quantity, 0), items_count: cart.length }); }} onContinueShopping={() => navigateTo('products')} t={t} />;
       case 'checkout': return <CheckoutPage cart={cart} onPlaceOrder={handlePlaceOrder} onBack={() => navigateTo('cart')} t={t} lang={lang} />;
       case 'order-confirmation': return <OrderConfirmationPage order={orderDetails} onContinueShopping={() => navigateTo('products')} t={t} />;
       case 'growers': return <VendorsPage t={t} />;

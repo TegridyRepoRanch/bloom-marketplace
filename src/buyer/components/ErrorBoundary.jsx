@@ -15,7 +15,11 @@ export class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // Error details intentionally not logged to prevent info leaks in production
+    // Log to console for debugging (no sensitive data exposed — just component stack)
+    console.error('[SiamClones Error]', error?.message || error);
+    if (errorInfo?.componentStack) {
+      console.error('[Component Stack]', errorInfo.componentStack);
+    }
   }
 
   render() {

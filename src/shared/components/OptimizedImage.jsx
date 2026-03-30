@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { getTransformedUrl, buildSrcSet } from '../imageUtils';
+
+// Inlined from imageUtils — Supabase Image Transforms not enabled (paid add-on).
+// Keeps OptimizedImage lightweight by avoiding the heavy imageUtils bundle (heic2any WASM).
+const getTransformedUrl = (url) => url || '';
+const buildSrcSet = () => '';
 
 /**
  * OptimizedImage — A robust, performance-optimized image component.
