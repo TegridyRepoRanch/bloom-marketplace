@@ -574,8 +574,8 @@ export const CheckoutPage = ({ cart = [], onPlaceOrder, onBack, t = (key) => key
     }
   };
 
-  // ---- Step indicators ----
-  const StepIndicator = () => (
+  // ---- Step indicators (inline JSX, not a component — avoids remount on re-render) ----
+  const stepIndicator = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, marginBottom: isMobile ? 24 : 40 }}>
       {[
         { num: 1, label: t('step_delivery') },
@@ -608,16 +608,16 @@ export const CheckoutPage = ({ cart = [], onPlaceOrder, onBack, t = (key) => key
     </div>
   );
 
-  // ---- Order summary (shared) ----
-  const OrderSummary = () => (
+  // ---- Order summary (inline JSX, not a component — avoids remount on re-render) ----
+  const orderSummary = (
     <div style={{
       background: colors.cream, borderRadius: 16, padding: isMobile ? 14 : 20, marginBottom: isMobile ? 20 : 32,
     }}>
       <h3 style={{ fontSize: 16, fontWeight: 700, color: colors.dark, marginBottom: 16 }}>{t('checkout_summary')}</h3>
       {cart.map((item, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ color: colors.gray }}>{item.product.title} × {item.quantity}</span>
-          <span style={{ fontWeight: 600, color: colors.dark }}>฿{(item.product.price * item.quantity).toFixed(0)}</span>
+          <span style={{ color: colors.gray }}>{item.product?.title} × {item.quantity}</span>
+          <span style={{ fontWeight: 600, color: colors.dark }}>฿{((item.product?.price || 0) * item.quantity).toFixed(0)}</span>
         </div>
       ))}
       <div style={{ borderTop: `1px solid ${colors.blush}`, paddingTop: 12, marginTop: 12 }}>
@@ -648,13 +648,13 @@ export const CheckoutPage = ({ cart = [], onPlaceOrder, onBack, t = (key) => key
           {t('checkout_title')} 📦
         </h2>
 
-        <StepIndicator />
+        {stepIndicator}
 
         <div style={{
           background: colors.white, borderRadius: 24, padding: isMobile ? 20 : 40,
           boxShadow: '0 10px 40px rgba(45, 125, 70, 0.15)',
         }}>
-          <OrderSummary />
+          {orderSummary}
 
           {error && (
             <div role="alert" style={{

@@ -15,6 +15,16 @@ export const ProductDetailPage = ({ product, onBack, onAddToCart, t = (key) => k
   const [added, setAdded] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
+  if (!product) return (
+    <section style={{ minHeight: '100vh', padding: '120px 24px 80px', background: colors.cream, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 64, marginBottom: 16 }}>🌱</p>
+        <h2 style={{ fontSize: 24, fontWeight: 700, color: colors.dark, marginBottom: 16 }}>{t('product_not_found')}</h2>
+        <button onClick={onBack} style={{ padding: '14px 32px', background: colors.primary, color: colors.white, border: 'none', borderRadius: 25, fontWeight: 600, fontSize: 16, cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>{t('back_to_products')}</button>
+      </div>
+    </section>
+  );
+
   const handleAddToCart = () => {
     onAddToCart(product, quantity);
     setAdded(true);

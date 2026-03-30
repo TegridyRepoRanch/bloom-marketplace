@@ -54,8 +54,8 @@ export const CartPage = ({ cart = [], onUpdateQuantity, onRemove, onCheckout, on
                     overflow: 'hidden', flexShrink: 0,
                   }}>
                     <OptimizedImage
-                      src={item.product.images?.[0]}
-                      alt={item.product.title}
+                      src={item.product?.images?.[0]}
+                      alt={item.product?.title || ''}
                       width={160}
                       style={{
                         width: isMobile ? 60 : 80,
@@ -67,8 +67,8 @@ export const CartPage = ({ cart = [], onUpdateQuantity, onRemove, onCheckout, on
 
                   {/* Details - on mobile, spans full width below image */}
                   <div style={{ gridColumn: isMobile ? '1 / -1' : undefined }}>
-                    <h4 style={{ fontSize: isMobile ? 14 : 18, fontWeight: 600, color: colors.dark, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product.title}</h4>
-                    <p style={{ fontSize: isMobile ? 12 : 14, color: colors.gray, marginTop: 4 }}>฿{parseFloat(item.product.price).toFixed(0)} {getPriceUnitLabel(item.product.price_unit, t, item.product.category)}</p>
+                    <h4 style={{ fontSize: isMobile ? 14 : 18, fontWeight: 600, color: colors.dark, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.product?.title}</h4>
+                    <p style={{ fontSize: isMobile ? 12 : 14, color: colors.gray, marginTop: 4 }}>฿{parseFloat(item.product?.price || 0).toFixed(0)} {getPriceUnitLabel(item.product?.price_unit, t, item.product?.category)}</p>
                   </div>
 
                   {/* Quantity - right side on mobile */}
@@ -89,7 +89,7 @@ export const CartPage = ({ cart = [], onUpdateQuantity, onRemove, onCheckout, on
                   {/* Price - spans full width on mobile, below quantity */}
                   <div style={{ gridColumn: isMobile ? '1 / -1' : undefined, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: isMobile ? 8 : 0 }}>
                     <p style={{ fontSize: isMobile ? 14 : 20, fontWeight: 700, color: colors.primary }}>
-                      ฿{(item.product.price * item.quantity).toFixed(0)}
+                      ฿{((item.product?.price || 0) * item.quantity).toFixed(0)}
                     </p>
                     {/* Remove */}
                     <button onClick={() => onRemove(index)} style={{

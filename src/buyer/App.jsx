@@ -155,7 +155,8 @@ const App = () => {
           } else {
             setCurrentPage('products');
           }
-        });
+        })
+        .catch(() => setCurrentPage('products'));
     } else if (hash && hash !== 'home') {
       setCurrentPage(hash);
       window.history.replaceState({ page: hash }, '', `#${hash}`);
